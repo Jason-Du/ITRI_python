@@ -8,7 +8,7 @@ import os
 # 126284.8~~~157856
 # 126285-157856
 
-l = ltspice.Ltspice(os.path.dirname(__file__)+'\\DAB_IBDC.raw')
+l = ltspice.Ltspice(os.path.dirname(__file__)+'\\Draft3.raw')
 # Make sure that the .raw file is located in the correct path
 l.parse() 
 
@@ -17,15 +17,15 @@ print(len(time))
 print(time[126285:157856])
 # print(np.max(time))
 # print(type(time))
-V_source = l.get_data('V(n007)')
-V_cap = l.get_data('V(n009)')
+# V_source = l.get_data('V(n007)')
+V_cap = l.get_data('V(N009,N010)')
 
-print(type(V_source))
-print(len(V_source))
-print(np.min(V_source))
+# print(type(V_source))
+# print(len(V_source))
+# print(np.min(V_source))
 
 
 #plt.plot(time[126285:157856], V_source[126285:157856])
-plt.scatter(time[126285:157856], V_source[126285:157856],marker='+')
+plt.scatter(time[126285:157856],V_cap[126285:157856],marker='+')
 # plt.plot(time, V_cap)
 plt.show()
