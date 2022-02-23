@@ -5,103 +5,160 @@ from matplotlib.ticker import MaxNLocator
 from matplotlib.ticker import AutoLocator
 import matplotlib.ticker as tick
 from matplotlib.ticker import FormatStrFormatter
-DRAW=False
-data = LTSpiceLogReader("./result/r8002cnd3_MOS_N_L.log")
-wanted_label=["tr1","tr2","imax"]
-# "./result/r8002cnd3_MOS_N_L.log"
-# "monte_SiC.log"
-# print("Number of steps  :", data.step_count)
-step_names = data.get_step_vars()
-meas_names = data.get_measure_names()
-print(step_names)
-print(meas_names)
-# print(step_names)
-# for step in step_names:
-#     print(step)# tol
-# for name in meas_names:
-#     print(name)# imax_FROM# imax_TO# tr1# tr1_FROM# tr1_TO# tr2# tr2_FROM# tr2_TO
-# for i in range(data.step_count):
-#     print([float(data[step][i])for step in step_names])
-#     print([float(data[name][i])for name in meas_names])
+from os import listdir
+from palettable.colorbrewer import BrewerMap
+from os.path import isfile, isdir, join
+import re
+import seaborn as sns
+import pandas as pd
 
-#定義要觀察的量測指標
-data_dict={}
-for data_label in wanted_label:
-    data_dict[data_label]=data[data_label]
-step_list=[x+1 for x in data[list(step_names)[0]]] # """幅度 <0 為減少 >0 為增加"""  調整為  """變化幅度 <1 為減少 >1 為增加"""
+DRAW_1=False
+DRAW_2=False
+MAX_VARIATION_ANALY=True
+param_num=1
+def anlze_log_file(meas_params=[],aging_coffs=[],logfile=""):
+    # "./result/r8002cnd3_MOS_N_L.log"
+    # "monte_SiC.log"
+    # print("Number of steps  :", data.step_count)
+    data = LTSpiceLogReader(logfile)
+    step_names = data.get_step_vars()
+    meas_names = data.get_measure_names()
+    # print(step_names)# for step in step_names  print(step)# tol
+    # print(meas_names)#data[step][i])for step in step_names] data[name][i])for name in meas_names])
+    # print(data["tol1"])
+    #定義要觀察的量測指標
+    data_dict={}
+    step_dict = {}
+    for meas_param in meas_params:
+        data_dict[meas_param]=data[meas_param]
+    for aging_coff in aging_coffs:
+        step_dict[aging_coff]=data[aging_coff]
+    var_dict = {}
+    var_max_dict = {}
+    var_max_idxs = {}
+    #以第一筆資料當作比較依據 後需資料除以 第一筆資料 查看其變化幅度 <1 為減少 >1 為增加
+    for meas_param in meas_params:
+        data_dict[meas_param]= [float(x/data_dict[meas_param][0]) for x in data_dict[meas_param]]
+        var_dict[meas_param]=[ x-1 for x in data_dict[meas_param]]    #資料全部減1 獲取變化的"幅度" <0 為減少 >0 為增加
+        var_max_dict[meas_param] =max(var_dict[meas_param],key=abs) #找出變化最大變化的"幅度"
+        var_max_idxs[meas_param]=var_dict[meas_param].index(var_max_dict[meas_param])#    # 把變化最大的資料 的index 儲存起來
+
+    # 把變化最大的資料 print 出來
+    # print(" rise time increase rate  : {} %".format( (  var_max_dict["tr1"]*100) )  )
+    # print(" fall time increase rate  : {} %".format( ( var_max_dict["tr2"]*100) )  )
+    # print(" maximum id current  increase rate : {} % ".format( ( var_max_dict["imax"]*100) )  )
+
+    return data_dict,step_dict,var_max_idxs,var_max_dict
+if __name__ == '__main__':
+    if MAX_VARIATION_ANALY:
+        files = listdir("./result/{}".format(param_num))
+        meas_params = ["tr1", "tr2", "imax"]
+        aging_coffs = ["tol1"]
+        var_max_idxs={}
+        one_max_variation={}
+        max_variations={"measure_value":[],"measure_name":[],"param_name":[]}
+
+        for f_idx, f in enumerate(files):
+            pass
+
+            logfile = "./result/{}/".format(param_num)+f
+            data_dict, step_dict,var_max_idxs,var_max_dict= anlze_log_file(meas_params=meas_params,aging_coffs=aging_coffs,logfile=logfile)
+            pattern = re.compile(r"r8002cnd3_(.*).log")
+            mod_par=re.search(pattern,f)
+            # if [var_max_dict[meas_param]for meas_param in meas_params]!=[0,0,0]:#納入繪圖條件設置[0,0,0]代表三個量測值皆無變化不與討論
+            if var_max_dict["imax"]!=0:#濾出 imax 不等於0的資訊
+                max_variations["measure_value"]=max_variations["measure_value"]+[var_max_dict[meas_param]for meas_param in meas_params]
+                max_variations["measure_name"]=max_variations["measure_name"]+[meas_param for meas_param in meas_params]
+                max_variations["param_name"]=max_variations["param_name"]+[mod_par.group(1)for meas_param in meas_params]
+
+        df=pd.DataFrame(max_variations)
+
+        one_max_variation["measure_value"] = [x for x,m_name in zip(max_variations["measure_value"],max_variations["measure_name"]) if m_name == "imax"]
+        one_max_variation["param_name"] = [x for x,m_name in zip(max_variations["param_name"],max_variations["measure_name"]) if m_name == "imax"]
+        df2 = pd.DataFrame(one_max_variation)
+        df2=df2.sort_values("measure_value")
 
 
-#以第一筆資料當作比較依據 後需資料除以 第一筆資料 查看其變化幅度 <1 為減少 >1 為增加
-for data_label in wanted_label:
-    data_dict[data_label] = [float(x/data_dict[data_label][0]) for x in data_dict[data_label]]
+        fig, ax = plt.subplots(figsize=(20, 10))
 
-# 把變化最大的資料 print 出來
-#資料全部減1 獲取變化的"幅度" <0 為減少 >0 為增加
-var_dict={}
-var_dict["tr1"]=[ x-1 for x in data_dict["tr1"]]
-var_dict["tr2"]=[ x-1 for x in data_dict["tr2"]]
-var_dict["imax"]=[ x-1 for x in data_dict["imax"]]
-
-var_max_dict={}
-#找出變化最大變化的"幅度"
-var_max_dict["tr1"] = max(var_dict["tr1"],key=abs)
-var_max_dict["tr2"] = max(var_dict["tr2"],key=abs)
-var_max_dict["imax"] = max(var_dict["imax"],key=abs)
-
-print(" rise time increase rate  : {} %".format( (  var_max_dict["tr1"]*100) )  )
-print(" fall time increase rate  : {} %".format( ( var_max_dict["tr2"]*100) )  )
-print(" maximum id current  increase rate : {} % ".format( ( var_max_dict["imax"]*100) )  )
-
-# 把變化最大的資料 的index 儲存起來
-rise_time_idx=var_dict["tr1"].index(var_max_dict["tr1"])
-fall_time_idx=var_dict["tr2"].index(var_max_dict["tr2"])
-max_id_idx=var_dict["imax"].index(var_max_dict["imax"])
-
-# 繪製曲線圖 橫縱軸都是以增加幅度繪製
+        # color=sns.color_palette("Set2")
+        # sns.barplot(x="param_name",y="measure_value",hue="measure_name",data=df,ci=None,ax=ax,palette=color[0:3])
+        # ax.set_ylim(-1,1.5)
+        # ax.yaxis.grid()
 
 
 
+        palette_2 = sns.color_palette("flare", n_colors=len(one_max_variation["param_name"]))
+        # palette_2.reverse()
+        ax_s=sns.barplot(x="param_name", y="measure_value", data=df2, ci=None, ax=ax,palette=palette_2)#palette 讓使用者可以定義多個顏色在圖表上 color 選單僅有一個參數可以使用
+        ax.set_ylabel("rate", fontsize=15, rotation=0)
+        ax.yaxis.set_label_coords(-0.05, 1.02)
+        ax.yaxis.grid()
+        # ax.set_yscale('log')
+        ax_s.bar_label(ax_s.containers[0])
+        ax.set_xlabel("param name", fontsize=15)
+        ax.set_title("aging param variation ", fontsize=20,)
 
-if DRAW:
-    y_low=0.9
-    y_high=1.3
-    fig,axes=plt.subplots(1,3,figsize=(20, 10))
-    #繪製模擬時間內的最大電流
-    axes[0].plot(step_list,data_dict["imax"],color='red' )
-    axes[0].plot(step_list[max_id_idx],data_dict["imax"][max_id_idx],marker="*",color="black",markersize=10)
-    axes[0].yaxis.set_major_locator(MaxNLocator(5))
-    axes[0].xaxis.set_major_locator(MaxNLocator(5))
-    axes[0].set_xlabel("Cap variation(rate)",fontsize=15)
-    axes[0].set_xlabel("Junction potential variation(rate)",fontsize=15)
-    axes[0].set_title("ID current maximum",fontsize=15)
-    axes[0].tick_params(axis='x', labelsize=15)
-    axes[0].tick_params(axis='y', labelsize=15)
-    # axes[0].set_ylim(min(data_dict["imax"]),max(data_dict["imax"]))
-    axes[0].set_xlim(1.00,2.00)
-    axes[0].set_ylim(y_low,y_high)
-    #繪製模擬時間內的rise time
-    axes[1].plot(step_list,data_dict["tr1"],color='blue')
-    axes[1].plot(step_list[rise_time_idx],data_dict["tr1"][rise_time_idx],marker="*",color="black",markersize=10)
-    axes[1].yaxis.set_major_locator(MaxNLocator(5))
-    axes[1].xaxis.set_major_locator(MaxNLocator(5))
-    axes[1].set_xlabel("Cap variation(rate)",fontsize=15)
-    axes[1].set_xlabel("Junction potential variation(rate)",fontsize=15)
-    axes[1].set_title("rise time ",fontsize=20)
-    axes[1].tick_params(axis='x', labelsize=15)
-    axes[1].tick_params(axis='y', labelsize=15)
-    # axes[1].set_ylim(min(data_dict["tr1"]),max(data_dict["tr1"]))
-    axes[1].set_ylim(y_low,y_high)
-    #繪製模擬時間內的fall time
-    axes[2].plot(step_list,data_dict["tr2"],color='blue')
-    axes[2].plot(step_list[fall_time_idx],data_dict["tr2"][fall_time_idx],marker="*",color="black",markersize=10)
-    axes[2].yaxis.set_major_locator(MaxNLocator(5))
-    axes[2].xaxis.set_major_locator(MaxNLocator(5))
-    axes[2].set_xlabel("Cap variation(rate)",fontsize=15)
-    axes[2].set_xlabel("Junction potential variation(rate)",fontsize=15)
-    axes[2].set_title("fall time ",fontsize=20)
-    axes[2].tick_params(axis='x', labelsize=15)
-    axes[2].tick_params(axis='y', labelsize=15)
-    # axes[2].set_ylim(min(data_dict["tr2"]),max(data_dict["tr2"]))
-    axes[2].set_ylim(y_low,y_high)
-    
-    plt.show()
+
+        plt.show()
+
+
+
+    # 繪製曲線圖 橫縱軸都是以增加幅度繪製
+    if DRAW_2:
+        pass
+
+
+    if DRAW_1:
+        logfile = "./result/1/r8002cnd3_MOS_N_L.log"
+        meas_params = ["tr1", "tr2", "imax"]
+        aging_coffs = ["tol1"]
+        data_dict, step_dict,var_max_idxs,var_max_dict=anlze_log_file(meas_params=meas_params,aging_coffs=aging_coffs,logfile=logfile)
+        step_list=[x+1for x in step_dict["tol1"]]
+
+
+
+        y_low=0.1
+        y_high=2
+        fig,axes=plt.subplots(1,3,figsize=(20, 10))
+        #繪製模擬時間內的最大電流
+        color = sns.color_palette("Set1")
+        # sns.set()
+        axes[0].plot(step_list,data_dict["imax"],color=color[0] )
+        axes[0].plot(step_list[var_max_idxs["imax"]],data_dict["imax"][var_max_idxs["imax"]],marker="*",color="black",markersize=10)
+        axes[0].yaxis.set_major_locator(MaxNLocator(5))
+        axes[0].xaxis.set_major_locator(MaxNLocator(5))
+        axes[0].set_xlabel("variation(rate)",fontsize=15)
+        axes[0].set_title("ID current maximum",fontsize=15)
+        axes[0].tick_params(axis='x', labelsize=15)
+        axes[0].tick_params(axis='y', labelsize=15)
+        # axes[0].set_ylim(min(data_dict["imax"]),max(data_dict["imax"]))
+        axes[0].set_xlim(1.00,2.00)
+        axes[0].yaxis.grid()
+        axes[0].set_ylim(y_low,y_high)
+        #繪製模擬時間內的rise time
+        axes[1].plot(step_list,data_dict["tr1"],color=color[1])
+        axes[1].plot(step_list[var_max_idxs["tr1"]],data_dict["tr1"][var_max_idxs["tr1"]],marker="*",color="black",markersize=10)
+        axes[1].yaxis.set_major_locator(MaxNLocator(5))
+        axes[1].xaxis.set_major_locator(MaxNLocator(5))
+        axes[1].set_xlabel("variation(rate)",fontsize=15)
+        axes[1].set_title("rise time ",fontsize=20)
+        axes[1].tick_params(axis='x', labelsize=15)
+        axes[1].tick_params(axis='y', labelsize=15)
+        # axes[1].set_ylim(min(data_dict["tr1"]),max(data_dict["tr1"]))
+        axes[1].yaxis.grid()
+        axes[1].set_ylim(y_low,y_high)
+        #繪製模擬時間內的fall time
+        axes[2].plot(step_list,data_dict["tr2"],color=color[2] )
+        axes[2].plot(step_list[var_max_idxs["tr2"]],data_dict["tr2"][var_max_idxs["tr2"]],marker="*",color="black",markersize=10)
+        axes[2].yaxis.set_major_locator(MaxNLocator(5))
+        axes[2].xaxis.set_major_locator(MaxNLocator(5))
+        axes[2].set_xlabel("variation(rate)",fontsize=15)
+        axes[2].set_title("fall time ",fontsize=20)
+        axes[2].tick_params(axis='x', labelsize=15)
+        axes[2].tick_params(axis='y', labelsize=15)
+        # axes[2].set_ylim(min(data_dict["tr2"]),max(data_dict["tr2"]))
+        axes[2].yaxis.grid()
+        axes[2].set_ylim(y_low,y_high)
+
+        plt.show()

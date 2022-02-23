@@ -5,7 +5,7 @@ from matplotlib.ticker import AutoLocator
 import matplotlib.ticker as tick
 from matplotlib.ticker import FormatStrFormatter
 import re
-log_data  = open("../script_sim/result/r8002cnd3_MOS_N_L.log", 'r')
+log_data  = open("../script_sim/result/1/r8002cnd3_MOS_N_L.log", 'r')
 step_num=100 #step=n 實際模擬次數為n+1 注意!!!!!!!!!!!!!!!!!!!!!
 step_list = []
 measure_name_list=[]
@@ -84,8 +84,8 @@ max_id_idx=var_dict["imax"].index(var_max_dict["imax"])
 
 # 繪製曲線圖 橫縱軸都是以增加幅度繪製
 
-y_low=0.9
-y_high=1.3
+y_low=0.1
+y_high=2
 fig,axes=plt.subplots(1,3,figsize=(20, 10))
 #繪製模擬時間內的最大電流
 axes[0].plot(step_list,data_dict["imax"],color='red' )

@@ -29,11 +29,24 @@ import os
 # plt.scatter(time[126285:157856],V_cap[126285:157856],marker='+')
 # # plt.plot(time, V_cap)
 # plt.show()
-lst = [{'id':'1234','name':'Jason'}, {'id':'2345','name':'Tom'}, {'id':'3456','name':'Tom'}]
-for (index, d) in enumerate(lst):
-    if d["name"] == "Tom":
-        print(index)
-tom_index = next((index for (index, d) in enumerate(lst) if d["name"] == "Tom"),None)
-# tom_index = next((index for (index, d) in enumerate(lst) if d["name"] == "Tom"), None)
-print(tom_index)
+# lst = [{'id':'1234','name':'Jason'}, {'id':'2345','name':'Tom'}, {'id':'3456','name':'Tom'}]
+# for (index, d) in enumerate(lst):
+#     if d["name"] == "Tom":
+#         print(index)
+# tom_index = next((index for (index, d) in enumerate(lst) if d["name"] == "Tom"),None)
+# # tom_index = next((index for (index, d) in enumerate(lst) if d["name"] == "Tom"), None)
+# print(tom_index)
 # 1
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+titanic_dataset = sns.load_dataset("titanic")
+print(type(titanic_dataset))
+print(titanic_dataset)
+print(titanic_dataset.keys())
+print(type(titanic_dataset["survived"]))
+sns.barplot(x = "class", y = "survived", hue = "embark_town", data = titanic_dataset,ci=None)
+plt.show()
+# hue= measure_name
+# x=   param name
+#y= measure value
