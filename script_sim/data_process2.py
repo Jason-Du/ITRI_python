@@ -114,6 +114,8 @@ if __name__ == '__main__':
 
 
 
+
+
     # 繪製曲線圖 橫縱軸都是以增加幅度繪製
     if DRAW_2:
         logfile = "monte_SiC.log"
