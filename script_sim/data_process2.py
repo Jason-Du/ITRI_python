@@ -113,9 +113,6 @@ if __name__ == '__main__':
         plt.show()
 
 
-
-
-
     # 繪製曲線圖 橫縱軸都是以增加幅度繪製
     if DRAW_2:
         logfile = "monte_SiC.log"
@@ -127,20 +124,20 @@ if __name__ == '__main__':
         fig, ax = plt.subplots(1,1,figsize=(20, 10))
         one_variation={}
         one_variation["imax"]=var_dict_percent["imax"]
-        one_variation["tol1"] =step_dict["tol1"]
-        one_variation["tol2"] =step_dict["tol2"]
+        one_variation["tol1"] =[x+1for x in step_dict["tol1"]]
+        one_variation["tol2"] =[x+1for x in step_dict["tol2"]]
         one_variation=pd.DataFrame(one_variation)
         one_variation=one_variation.pivot("tol1","tol2","imax")
-        ax_s = sns.heatmap(one_variation,xticklabels=10,yticklabels=10)
-        ax_s.set_xticklabels(ax_s.get_xmajorticklabels(), fontsize = 12)
-        ax_s.set_yticklabels(ax_s.get_ymajorticklabels(), fontsize = 12)
-        ax.set_xlabel("MOS_N VTO variation(rate)", fontsize=15)
-        ax.set_ylabel("MOS_N GAMMA variation(rate)", fontsize=15)
+        ax_s = sns.heatmap(one_variation,xticklabels=10,yticklabels=10,cbar_kws={"orientation":"vertical","label":"Max(ID) variation (%)","location":"right"})
+        ax_s.set_xticklabels(ax_s.get_xmajorticklabels(), fontsize = 15)
+        ax_s.set_yticklabels(ax_s.get_ymajorticklabels(), fontsize = 15)
+        ax_s.figure.axes[-1].yaxis.label.set_size(18)
+        cbar =ax_s.collections[0].colorbar
+        cbar.ax.tick_params(labelsize=15)
+        ax.set_xlabel("MOS_N VTO variation(rate)", fontsize=18)
+        ax.set_ylabel("MOS_N GAMMA variation(rate)", fontsize=18)
         ax.set_title("Max(ID) variation v.s. MOS_N GAMMA / MOS_N VTO",fontsize=20)
         plt.show()
-
-
-
 
 
 
