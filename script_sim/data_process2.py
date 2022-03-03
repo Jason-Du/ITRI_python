@@ -49,8 +49,6 @@ def anlze_log_file(meas_params=[],aging_coffs=[],logfile=""):
         data_dict[meas_param]=data[meas_param]
         ref[meas_param]=data_dict[meas_param][ref_idx[0][0]]
 
-
-
     var_dict = {}
     var_max_dict = {}
     var_max_idxs = {}
@@ -77,6 +75,7 @@ if __name__ == '__main__':
         var_max_idxs={}
         one_max_variation={}
         max_variations={"measure_value":[],"measure_name":[],"param_name":[]}
+        param_sel="imax"
 
         for f_idx, f in enumerate(files):
             pass
@@ -86,15 +85,15 @@ if __name__ == '__main__':
             pattern = re.compile(r"r8002cnd3_(.*).log")
             mod_par=re.search(pattern,f)
             # if [var_max_dict[meas_param]for meas_param in meas_params]!=[0,0,0]:#納入繪圖條件設置[0,0,0]代表三個量測值皆無變化不與討論
-            if var_max_dict["imax"]!=0 and mod_par.group(1) not in ["MOS_N_L","MOS_N_W"]:#濾出 imax 不等於0的資訊
+            if var_max_dict[param_sel]!=0 and mod_par.group(1) not in ["MOS_N_L","MOS_N_W"]:#濾出 imax 不等於0的資訊
                 max_variations["measure_value"]=max_variations["measure_value"]+[var_max_dict[meas_param]*100 for meas_param in meas_params]
                 max_variations["measure_name"]=max_variations["measure_name"]+[meas_param for meas_param in meas_params]
                 max_variations["param_name"]=max_variations["param_name"]+[mod_par.group(1)for meas_param in meas_params]
 
         df=pd.DataFrame(max_variations)
 
-        one_max_variation["measure_value"] = [x for x,m_name in zip(max_variations["measure_value"],max_variations["measure_name"]) if m_name == "imax"]
-        one_max_variation["param_name"] = [x for x,m_name in zip(max_variations["param_name"],max_variations["measure_name"]) if m_name == "imax"]
+        one_max_variation["measure_value"] = [x for x,m_name in zip(max_variations["measure_value"],max_variations["measure_name"]) if m_name == param_sel]
+        one_max_variation["param_name"] = [x for x,m_name in zip(max_variations["param_name"],max_variations["measure_name"]) if m_name == param_sel]
         df2 = pd.DataFrame(one_max_variation)
         df2=df2.sort_values("measure_value")
 
@@ -120,7 +119,7 @@ if __name__ == '__main__':
         _, xlabels = plt.xticks()
         ax_s.set_xticklabels(xlabels, size=12)
         ax_s.set_yticklabels(ax_s.get_yticks(), size=15)
-        ax.set_title(" Max(ID) variation v.s. Aging parameter", fontsize=20)
+        ax.set_title(param_sel+" v.s. Aging parameter", fontsize=20)
         plt.show()
 
 

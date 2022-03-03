@@ -175,5 +175,4 @@ if __name__ == '__main__':
     #     LTC.wait_completion()
     #     shutil.copyfile(r"C:\Users\user\Documents\LTspiceXVII\file\Montecarlo\monte_SiC_1.log", "./result/{}/".format(param_num)+str(log_name.group(1))+".log")
     #     break
-
     ##scripting 跑 ltspice 模擬
