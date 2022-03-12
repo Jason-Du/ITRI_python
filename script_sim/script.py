@@ -171,7 +171,7 @@ if __name__ == '__main__':
     #     shutil.copyfile("./lib/"+f,r"C:\Users\user\Documents\LTspiceXVII\file\LIB\r8002cnd3.lib")
     #     pattern=re.compile(r"(.+).lib")
     #     log_name= re.search(pattern,f)
-        LTC = SimCommander(r"C:\Users\user\Documents\LTspiceXVII\file\Montecarlo\monte_SiC.asc")
+    #     LTC = SimCommander(r"C:\Users\user\Documents\LTspiceXVII\file\Montecarlo\monte_SiC.asc")
     #     LTC.run()
     #     LTC.wait_completion()
     #     shutil.copyfile(r"C:\Users\user\Documents\LTspiceXVII\file\Montecarlo\monte_SiC_1.log", "./result/{}/".format(param_num)+str(log_name.group(1))+".log")

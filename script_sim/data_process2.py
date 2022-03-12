@@ -17,9 +17,9 @@ from mpl_toolkits import mplot3d
 from matplotlib import cm
 import numpy as np
 
-DRAW_1=False
+DRAW_1=True
 DRAW_2=False
-MAX_VARIATION_ANALY=True
+MAX_VARIATION_ANALY=False
 param_num=1
 def anlze_log_file(meas_params=[],aging_coffs=[],logfile=""):
     # "./result/r8002cnd3_MOS_N_L.log"
@@ -56,8 +56,8 @@ def anlze_log_file(meas_params=[],aging_coffs=[],logfile=""):
     #以第一筆資料當作比較依據 後需資料除以 第一筆資料 查看其變化幅度 <1 為減少 >1 為增加
     for meas_param in meas_params:
         data_dict[meas_param]= [float(x/ref[meas_param]) for x in data_dict[meas_param]]
-        var_dict[meas_param]=[ x-1 for x in data_dict[meas_param]]    #資料全部減1 獲取變化的"幅度" <0 為減少 >0 為增加
-        var_dict_percent[meas_param] = [x*100for x in var_dict[meas_param]]
+        var_dict[meas_param]=[ x-1 for x in data_dict[meas_param] ]    #資料全部減1 獲取變化的"幅度" <0 為減少 >0 為增加
+        var_dict_percent[meas_param] = [x*100 for x in var_dict[meas_param]]
         var_max_dict[meas_param] =max(var_dict[meas_param],key=abs) #找出變化最大變化的"幅度"
         var_max_idxs[meas_param]=var_dict[meas_param].index(var_max_dict[meas_param])#    # 把變化最大的資料 的index 儲存起來
 
@@ -75,7 +75,7 @@ if __name__ == '__main__':
         var_max_idxs={}
         one_max_variation={}
         max_variations={"measure_value":[],"measure_name":[],"param_name":[]}
-        param_sel="imax"
+        param_sel="tr1"
 
         for f_idx, f in enumerate(files):
             pass
@@ -85,7 +85,7 @@ if __name__ == '__main__':
             pattern = re.compile(r"r8002cnd3_(.*).log")
             mod_par=re.search(pattern,f)
             # if [var_max_dict[meas_param]for meas_param in meas_params]!=[0,0,0]:#納入繪圖條件設置[0,0,0]代表三個量測值皆無變化不與討論
-            if var_max_dict[param_sel]!=0 and mod_par.group(1) not in ["MOS_N_L","MOS_N_W"]:#濾出 imax 不等於0的資訊
+            if var_max_dict[param_sel]!=0 and mod_par.group(1) not in ["MOS_N_L","MOS_N_W"]:#濾出 imax 不等於0的資訊 撇除不要考慮的 parameter
                 max_variations["measure_value"]=max_variations["measure_value"]+[var_max_dict[meas_param]*100 for meas_param in meas_params]
                 max_variations["measure_name"]=max_variations["measure_name"]+[meas_param for meas_param in meas_params]
                 max_variations["param_name"]=max_variations["param_name"]+[mod_par.group(1)for meas_param in meas_params]
@@ -167,7 +167,7 @@ if __name__ == '__main__':
 
 
     if DRAW_1:
-        logfile = "./result/1/r8002cnd3_MOS_N_CGSO.log"
+        logfile = "./result/1/r8002cnd3_MOS_N_KP.log"
         pattern = re.compile(r"r8002cnd3_(.*).log")
         mod_par = re.search(pattern,logfile)
         meas_params = ["tr1", "tr2", "imax"]
@@ -175,10 +175,8 @@ if __name__ == '__main__':
         data_dict, step_dict,var_dict,var_dict_percent,var_max_idxs,var_max_dict=anlze_log_file(meas_params=meas_params,aging_coffs=aging_coffs,logfile=logfile)
         step_list=[x+1for x in step_dict["tol1"]]
 
-
-
-        y_low=-100
-        y_high=100
+        y_low=-50
+        y_high=150
         fig,axes=plt.subplots(1,3,figsize=(20, 10))
         #繪製模擬時間內的最大電流
         color = sns.color_palette("Set1")
@@ -189,7 +187,7 @@ if __name__ == '__main__':
         axes[0].yaxis.set_major_locator(MaxNLocator(5))
         axes[0].xaxis.set_major_locator(MaxNLocator(5))
         axes[0].set_xlabel(mod_par.group(1)+" variation(rate)",fontsize=15)
-        axes[0].set_title("Max(drain current) (%)",fontsize=20)
+        axes[0].set_title("Drain current (%)",fontsize=20)
         axes[0].tick_params(axis='x', labelsize=15)
         axes[0].tick_params(axis='y', labelsize=15)
         # axes[0].set_ylim(min(data_dict["imax"]),max(data_dict["imax"]))
