@@ -50,15 +50,18 @@ import os
 # # hue= measure_name
 # x=   param name
 #y= measure value
-def aging_AF_coff(A,B,C,Temp,Vgate,a):
-    pass
-    AF_coff=A*(10**(C*Temp))*(10**(B*Vgate+a))
-    return AF_coff
-import numpy as np
-A=np.linspace(20,40,5)
-B=np.linspace(50,100,10)
-C=np.tile(A,(10,1))
-D=np.transpose(np.tile(B,(5,1)))
-E=aging_AF_coff(A=-17.2,B=0.4,C=-0.15,Temp=D,Vgate=C,a=0)
-print(E.shape)
-fig,axes=plt.subplots(1,1,figsize=(20, 10))
+# def aging_AF_coff(A,B,C,Temp,Vgate,a):
+#     pass
+#     AF_coff=A*(10**(C*Temp))*(10**(B*Vgate+a))
+#     return AF_coff
+# import numpy as np
+# A=np.linspace(20,40,5)
+# B=np.linspace(50,100,10)
+# C=np.tile(A,(10,1))
+# D=np.transpose(np.tile(B,(5,1)))
+# E=aging_AF_coff(A=-17.2,B=0.4,C=-0.15,Temp=D,Vgate=C,a=0)
+# print(E.shape)
+# fig,axes=plt.subplots(1,1,figsize=(20, 10))
+# load dataset
+
+

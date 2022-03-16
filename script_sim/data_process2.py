@@ -17,9 +17,9 @@ from mpl_toolkits import mplot3d
 from matplotlib import cm
 import numpy as np
 
-DRAW_1=True
+DRAW_1=False
 DRAW_2=False
-MAX_VARIATION_ANALY=False
+MAX_VARIATION_ANALY=True
 param_num=1
 def anlze_log_file(meas_params=[],aging_coffs=[],logfile=""):
     # "./result/r8002cnd3_MOS_N_L.log"
@@ -75,7 +75,7 @@ if __name__ == '__main__':
         var_max_idxs={}
         one_max_variation={}
         max_variations={"measure_value":[],"measure_name":[],"param_name":[]}
-        param_sel="tr1"
+        param_sel="imax"
 
         for f_idx, f in enumerate(files):
             pass
@@ -167,7 +167,7 @@ if __name__ == '__main__':
 
 
     if DRAW_1:
-        logfile = "./result/1/r8002cnd3_MOS_N_KP.log"
+        logfile = "./result/1/r8002cnd3_MOS_N_TOX.log"
         pattern = re.compile(r"r8002cnd3_(.*).log")
         mod_par = re.search(pattern,logfile)
         meas_params = ["tr1", "tr2", "imax"]
