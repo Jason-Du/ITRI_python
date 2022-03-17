@@ -6,9 +6,12 @@ import operator as op
 import statistics
 import copy
 from statistics import mean
+from itertools import cycle, islice
 import matplotlib.patches as mpatches
 from matplotlib.ticker import FormatStrFormatter
 import scipy.io as matloader
+temp_ll=[40.0,100.0,150.0,200.0,210.0,220.0,230.0,240.0,250.0]
+
 def aging_AF_coff(A,B,C,Temp,Vgate,a):
     pass
     AF_coff=A*(10**(C*Temp))*(10**(B*Vgate+a))
@@ -18,11 +21,13 @@ def aging_AF_coff(A,B,C,Temp,Vgate,a):
 def temp_dr_analyze(read_file,temp_ll):
     all_temp=[]
     df=pd.read_csv(read_file)
+    ####################
     # for temp_data in df.keys()[1::2]:
-    #     for temp_inform in set(df[temp_data].dropna()):
+    #     for temp_inform in set(df[temp_data].drop()):
     #         all_temp.append(temp_inform)
     # temp_duration_dict={s_key:[] for s_key in sorted(set(all_temp))}
     #可得 最大temp 的集合
+    #############################
     temp_duration_dict = {s_key: [] for s_key in sorted(set(temp_ll))}
     temp_duration_dict["run"] = []
     for idx,(time_data,temp_data) in enumerate(zip(df.keys()[0::2],df.keys()[1::2])):
@@ -32,32 +37,35 @@ def temp_dr_analyze(read_file,temp_ll):
             temp_duration_dict[temp_inform].append(df[time_data][require_index[-1]]-df[time_data][require_index[0]])
         for i in set(temp_duration_dict.keys()).difference(set(df[temp_data].dropna())):
             if i !="run":
-                temp_duration_dict[i].append(0.01)
+                temp_duration_dict[i].append(0)
     new_d = {str(key): value for key, value in temp_duration_dict.items()}
     df2=pd.DataFrame(new_d)
     return df2
-def draw_temp_dR(file_lib,MOSFET_num_ll):
+def draw_temp_time(file_lib,MOSFET_num_ll):
     pass
     if len(MOSFET_num_ll)==1:
         print("Warning there is no 4 data please do not use this function")
-    fig, axes = plt.subplots(2,2, figsize=(18, 8))
+    fig, axes = plt.subplots(2,2, figsize=(18, 10))
     for idx,MOSFET_num in enumerate(MOSFET_num_ll):
-        df2 = temp_dr_analyze(file_lib+"/%s.csv"%MOSFET_num)
-        color = sns.color_palette("rocket_r", as_cmap=False, n_colors=10)
+        df2 = temp_dr_analyze(file_lib+"/%s.csv"%MOSFET_num,temp_ll=[40.0,100.0,150.0,200.0,210.0,220.0,230.0,240.0,250.0])
+        color = sns.color_palette("rocket_r", as_cmap=False, n_colors=len(temp_ll))
+        temp_color_dict = list(islice(cycle(color), None,len(temp_ll)))
+        # print(temp_color_dict)
         sns.set(style='white')
         df2=df2.set_index("run")
-        print(df2)
-        df2.plot(kind='bar', stacked=True, color=color,ax=axes[idx//2,idx%2])
+
+
+        df2.plot(kind='bar', stacked=True, color=temp_color_dict,ax=axes[idx//2,idx%2])
         axes[idx//2,idx%2].tick_params(axis='y', labelsize=15,rotation=30)
         axes[idx//2,idx%2].tick_params(axis='x', labelsize=15,rotation=30)
         axes[idx//2,idx%2].yaxis.grid()
         # axes[idx//2,idx%2].legend(["{} $^\circ$C".format(i) for i in df2.columns],fontsize=15,title="Temperatutre",fancybox=True)
         axes[idx // 2, idx % 2].get_legend().remove()
-        # axes[idx//2,idx%2].set_title("Power MOSFET %s High Temperature Test " %MOSFET_num, fontsize=20)
-        axes[idx // 2, idx % 2].set_xlabel("", fontsize=15)
+        axes[idx//2,idx%2].set_title("Power MOSFET %s High Temperature Test " %MOSFET_num, fontsize=10)
+        axes[idx // 2, idx % 2].set_xlabel("", fontsize=10)
         axes[idx//2,idx%2].set_ylabel("Test Run Duration (min)",fontsize=15)
         handles, labels = axes[idx//2,idx%2].get_legend_handles_labels()
-        fig.legend(handles, labels, loc='center left',fontsize=15,title="Temperatutre($^\circ$C)",fancybox=True)
+        fig.legend(handles, labels, loc='center left',fontsize=10,title="Temperatutre\n($^\circ$C)",fancybox=True)
     fig.suptitle("%d Power MOSFET High Temperature Test " %len(MOSFET_num_ll),fontsize=30)
 Temp_dR=True
 AF_COFF=False
@@ -66,6 +74,8 @@ Vth_AGING=False
 dR_AGING=False
 Temp_time=False
 Nominal_resistanc=0.25
+MOSFET_rdson_ll = ['MOSFET 14', 'MOSFET 8', 'MOSFET 9', 'MOSFET 36', 'MOSFET 11', 'MOSFET 12']
+MOSFET_TEMP_ll = ["dr14", "dr8", "dr9", "dr36", "dr11", "dr12"]
 # print( set([i for i in range(1,43)])-set([3,4,5,6,7,15,16,17,18,19,21,22,28,39,40,42,20,23,25,27,34,41]))
 
 def Calculate_MTTF(hours):
@@ -133,7 +143,7 @@ if Vth_AGING:
     df = pd.read_csv("./paper_dataset/Vth_aging.csv")
     df2 = pd.read_csv("./paper_dataset/Vth_aging_350K.csv")
     labels = ['AgingMOSFET 0', 'AgingMOSFET 2','AgingMOSFET 5', 'AgingMOSFET 6','AgingMOSFET 7']
-    X_list=['AgingMOSFET0X', 'AgingMOSFET2X','AgingMOSFET5X','AgingMOSFET6X','AgingMOSFET7X']
+    X_list=['AgingMOSFET0X', 'AgingMOSFET2X','AgingMOSFET5X','A   gingMOSFET6X','AgingMOSFET7X']
     Y_list = ['AgingMOSFET0Y', 'AgingMOSFET2Y', 'AgingMOSFET5Y', 'AgingMOSFET6Y','AgingMOSFET7Y']
     hour_array=[i for i in range(0,8,1)]
     hour_array.append(7.9)
@@ -191,33 +201,36 @@ if Vth_AGING:
     plt.show()
 
 if dR_AGING:
+    # 呈現出 MOSFET 體質的不同
     # 為7次thermal cycling 觀察其 aging 的結果
     # MOSFET 最大增加幅度 可以到達 0.9% per 10 miunites
     # 在總共的 Aging 時間裡面 平均值落在 0.01% ~
     # 可以在繪製一張圖表是關於 Aging 總時長的前半 後半 差異
-    df = pd.read_csv("./paper_dataset/dr_aging_800min.csv")
+    df_rdson = pd.read_csv("./paper_dataset/dr_aging_800min.csv")
     dict={}
-    labels = ['MOSFET 14', 'MOSFET 8','MOSFET 9', 'MOSFET 36','MOSFET 11','MOSFET 12']
-    X_list=['AgingMOSFET14X', 'AgingMOSFET8X' , 'AgingMOSFET9X','AgingMOSFET36X','AgingMOSFET11X','AgingMOSFET12X']
-    Y_list = ['AgingMOSFET14Y', 'AgingMOSFET8Y', 'AgingMOSFET9Y', 'AgingMOSFET36Y','AgingMOSFET11Y','AgingMOSFET12Y']
-    sample_scale=60 # 單位為 min
+    # labels = ['MOSFET 14', 'MOSFET 8','MOSFET 9', 'MOSFET 36','MOSFET 11','MOSFET 12']
+
+    # X_list=['AgingMOSFET14X', 'AgingMOSFET8X' , 'AgingMOSFET9X','AgingMOSFET36X','AgingMOSFET11X','AgingMOSFET12X']
+    # Y_list = ['AgingMOSFET14Y', 'AgingMOSFET8Y', 'AgingMOSFET9Y', 'AgingMOSFET36Y','AgingMOSFET11Y','AgingMOSFET12Y']
+    sample_scale=30 # 單位為 min
     slope=[]
 
     color=sns.color_palette("tab10")
     fig2, axes2 = plt.subplots(1, 1, figsize=(20, 10))
-    for idx,(X,Y,label) in enumerate(zip(X_list,Y_list,labels)):
-        df[Y][0] = 0
-        df[Y]=(df[Y]/Nominal_resistanc)*100
-        dict[label]=[(np.interp(idx+sample_scale-1,df[X],df[Y])-np.interp(idx,df[X],df[Y]))/sample_scale for idx in range(0,int(df[X][df[X].last_valid_index()]-sample_scale+1),sample_scale)]
-        axes2.plot(df[X], df[Y], color=color[idx], label=labels[idx])  # 繪製所有曲線
+    for idx,(X,Y,label) in enumerate(zip(df_rdson.columns[0::2],df_rdson.columns[1::2],MOSFET_rdson_ll)):
+        df_rdson[Y][0] = 0
+        df_rdson[Y]=(df_rdson[Y]/Nominal_resistanc)*100
+        dict[label]=[(np.interp(idx+sample_scale-1,df_rdson[X],df_rdson[Y])-np.interp(idx,df_rdson[X],df_rdson[Y]))/sample_scale
+                     for idx in range(0,int(df_rdson[X][df_rdson[X].last_valid_index()]-sample_scale+1),sample_scale)]# range(1,2,3) window size=3
+        axes2.plot(df_rdson[X], df_rdson[Y], color=color[idx], label=MOSFET_rdson_ll[idx])  # 繪製所有曲線
 
     Aging_time_scales=[35,35,35,35,180,240,240]
     Temperatures=[250,240,230,220,210,210,210]
     initial_time=0
     Aging_time_tick=[]
 
-    for idx,(age_time,Temperature) in enumerate(zip(Aging_time_scales,Temperatures)):
-        axes2.text(initial_time+(age_time/2), 160, "{} K".format(Temperature+273), horizontalalignment='center', size=15, color="r",style="italic", weight="bold")
+    for idx,(age_time,Temperature) in enumerate(zip(Aging_time_scales   ,Temperatures)):
+        axes2.text(initial_time+(age_time/2), 160, "{}$^\circ$C".format(Temperature), horizontalalignment='center', size=15, color="r",style="italic", weight="bold")
         initial_time = age_time + initial_time
         if(idx!=6):
             axes2.axvline(x=initial_time,color='r', linestyle='--')
@@ -257,12 +270,16 @@ if dR_AGING:
 
 if Temp_time:
     #36 8 11 14
-    Single=True
+    # 呈現 mosfet 加熱的溫度分布 以及時長分布
+    # 呈現出 mosfet 的加溫 36最為特別 是持續 250K 高溫持續烘烤
+    Single=False
     if Single:
+        temp_ll = [40.0, 100.0, 150.0, 200.0, 210.0, 220.0, 230.0, 240.0, 250.0]
         df2=temp_dr_analyze(read_file="./paper_dataset/NASA_MOSFET_TEMP/dr12.csv",temp_ll=[40.0,100.0,150.0,200.0,210.0,220.0,230.0,240.0,250.0])
         fig, axes = plt.subplots(1, 1, figsize=(20, 10))
-        color = sns.color_palette("rocket_r", as_cmap=False, n_colors=10)
-        # print(len(color))
+        color = sns.color_palette("rocket_r", as_cmap=False, n_colors=len(temp_ll))
+        temp_color_dict = list(islice(cycle(color), None,len(temp_ll)))
+
         sns.set(style='white')
         df2=df2.set_index("run")
         df2.plot(kind='bar', stacked=True, color=color,ax=axes)
@@ -275,15 +292,15 @@ if Temp_time:
         axes.set_ylabel("Test Run Duration (min)",fontsize=15)
         plt.show()
     else:
-        draw_temp_dR(file_lib="./paper_dataset/NASA_MOSFET_TEMP",MOSFET_num_ll=["dr36","dr8","dr11","dr14"])
+        draw_temp_time(file_lib="./paper_dataset/NASA_MOSFET_TEMP",MOSFET_num_ll=["dr36","dr8","dr11","dr14"])
         plt.show()
 if Temp_dR:
-    MOSFET_rdson_ll = ['MOSFET 14', 'MOSFET 8', 'MOSFET 9', 'MOSFET 36', 'MOSFET 11', 'MOSFET 12']
-    MOSFET_TEMP_ll=["dr14", "dr8", "dr9", "dr36","dr11","dr12"]
+    # 觀測出 單顆 mosfet 再同樣溫度下量測的數值 的確隨著老化次數加多 數值有所浮動
+    #36 這顆 mosfet 僅有一次run  所以 不可加入評比 只能評斷說 隨著溫度上升量到的Rth 值 會隨之上升
+    MOSFET_SEL='MOSFET 12'
     df_rdson = pd.read_csv("./paper_dataset/dr_aging_800min.csv")
     # print(df_rdson.columns[0::2])#X   time
     # print(df_rdson.columns[1::2])#Y   rdson
-    temp_ll = [40.0, 100.0, 150.0, 200.0, 210.0, 220.0, 230.0, 240.0, 250.0]
     dict={"rdson":[],"temp":[],"run":[],"MOSFET":[],"AVG":[]}
     for  time_label,rdson_label,MOSFET_rdson,MOSFET_TEMP in zip(df_rdson.columns[0::2],df_rdson.columns[1::2],MOSFET_rdson_ll,MOSFET_TEMP_ll):
         df2 = temp_dr_analyze(read_file="./paper_dataset/NASA_MOSFET_TEMP/"+MOSFET_TEMP+".csv",temp_ll=temp_ll)
@@ -300,8 +317,8 @@ if Temp_dR:
             arr0_last[i,:]=time_tick_table if i==0 else [time_duration[i-1]+j if j!=0 else 0 for j in time_tick_table]
         arr0_last=arr0_last.tolist()#last
     ######################
-        df_rdson[rdson_label][0] = 0
-        df_rdson[time_label][0] = 0
+        df_rdson[rdson_label][0] = 0#每顆MOSFET Variation 從第0 %開始計算
+        df_rdson[time_label][0] = 0 #time 從第0時刻開始計算
         df_rdson[rdson_label] = (df_rdson[rdson_label] / Nominal_resistanc) * 100
     #####################
         for idx,arr0_last_s in enumerate(arr0_last):
@@ -323,23 +340,37 @@ if Temp_dR:
                     dict["rdson"].extend([mean(rdson_s).tolist()])
                     dict["AVG"].extend("N" * rdson_s.shape[0])
                     dict["AVG"].extend("Y")
-                    dict["temp"].extend([temp_s] * (rdson_s.shape[0]+1))
+                    dict["temp"].extend([temp_s] * (rdson_s.shape[0]+1))# 因為AVG 向次 所以需要+1
                     dict["run"].extend(["run%d"%idx] * (rdson_s.shape[0]+1))
                     dict["MOSFET"].extend([MOSFET_rdson] * (rdson_s.shape[0]+1))
-        break
+
+
     df3=pd.DataFrame.from_dict(dict)
+    data_avg = df3[(df3.MOSFET == MOSFET_SEL) & (df3.AVG == "Y")]
+    # palette_ll=['green','orange','brown','dodgerblue','red','fuchsia','purple']
+    palette_ll=sns.color_palette('viridis', n_colors=len(data_avg["run"].unique()))
+    palette_ll.reverse()
+    color_dict = {run_name: color_s for run_name, color_s in zip(data_avg["run"].unique(), palette_ll)}
 
-    data = df3[(df3.MOSFET == "MOSFET 14") & (df3.AVG == "Y")]
-    print(data)
+    fig, axes = plt.subplots(1, 2, figsize=(20, 10))
+    sns.set()
+    sns.lineplot(x='temp', y='rdson',hue="run",data=data_avg,palette=color_dict,marker="o", linewidth=2, markersize=7)
+    sns.stripplot(data=df3[(df3.MOSFET == MOSFET_SEL) & (df3.AVG == "N")], x="temp", y="rdson", hue="run", ax=axes[0],palette=color_dict)
+    axes[0].set_title(MOSFET_SEL+" Rdson variation V.S Temperature ", fontsize=20)
+    axes[0].tick_params(axis='x', labelsize=15,rotation=30)
+    axes[0].tick_params(axis='y', labelsize=15,rotation=30)
+    axes[0].set_xlabel("Temperature($^\circ$C)",fontsize=15)
+    axes[0].set_ylabel("Rdson(%)", fontsize=15)
+    axes[0].legend(fontsize=10, title="Test run", title_fontsize=15)
+    axes[0].yaxis.grid()
 
-    # fig, axes = plt.subplots(1, 1, figsize=(20, 10))
-    # sns.stripplot(data=df3[df3.MOSFET=="MOSFET 36"], x="temp", y="rdson", hue="run", ax=axes, palette="rocket_r")
-    # axes.set_title("Rdson variation V.S Temperature ", fontsize=30)
-    # axes.tick_params(axis='x', labelsize=15,rotation=30)
-    # axes.tick_params(axis='y', labelsize=15,rotation=30)
-    # axes.set_xlabel("Temperature($^\circ$C)",fontsize=20)
-    # axes.set_ylabel("Rdson(%)", fontsize=20)
-    # axes.yaxis.grid()
-    # axes.legend(fontsize=10,title="Test run",title_fontsize=15)
-    # plt.show()
+    axes[1].set_title(MOSFET_SEL+" Average Rdson variation V.S Temperature ", fontsize=20)
+    axes[1].tick_params(axis='x', labelsize=15,rotation=30)
+    axes[1].tick_params(axis='y', labelsize=15,rotation=30)
+    axes[1].set_xlabel("Temperature($^\circ$C)",fontsize=15)
+    axes[1].set_ylabel("Rdson(%)", fontsize=15)
+    axes[1].legend(data_avg["run"].unique(),fontsize=10, title="Test run", title_fontsize=15)
+    axes[1].yaxis.grid()
+
+    plt.show()
 
