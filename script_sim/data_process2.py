@@ -1,26 +1,17 @@
 from PyLTSpice.LTSteps import LTSpiceLogReader
-import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
-from matplotlib.ticker import AutoLocator
-import matplotlib.ticker as tick
-from matplotlib.ticker import LinearLocator
-from matplotlib.ticker import FormatStrFormatter
 from os import listdir
-from palettable.colorbrewer import BrewerMap
-from os.path import isfile, isdir, join
 import re
 import seaborn as sns
 import pandas as pd
-import statistics
-from mpl_toolkits import mplot3d
-from matplotlib import cm
 import numpy as np
-
+from matplotlib.ticker import FormatStrFormatter
 DRAW_1=False
 DRAW_2=False
 MAX_VARIATION_ANALY=True
 param_num=1
+device_name="rd3l050sn"
 def anlze_log_file(meas_params=[],aging_coffs=[],logfile=""):
     # "./result/r8002cnd3_MOS_N_L.log"
     # "monte_SiC.log"
@@ -37,7 +28,8 @@ def anlze_log_file(meas_params=[],aging_coffs=[],logfile=""):
 
     ref = {}
     for aging_coff in aging_coffs:
-        step_dict[aging_coff]=[float("%.2f"%x) for x in data[aging_coff]]
+        step_dict[aging_coff]=[float("%.2f"%x) for x in data[aging_coff]]#因為在spice 的模擬過程中 1 step 為 0.01 精度故調整為0.2f
+
     step_size=len(step_dict[aging_coff])
     step_dict_bool = np.array([True] *step_size)
     for aging_coff in aging_coffs:
@@ -58,7 +50,7 @@ def anlze_log_file(meas_params=[],aging_coffs=[],logfile=""):
         data_dict[meas_param]= [float(x/ref[meas_param]) for x in data_dict[meas_param]]
         var_dict[meas_param]=[ x-1 for x in data_dict[meas_param] ]    #資料全部減1 獲取變化的"幅度" <0 為減少 >0 為增加
         var_dict_percent[meas_param] = [x*100 for x in var_dict[meas_param]]
-        var_max_dict[meas_param] =max(var_dict[meas_param],key=abs) #找出變化最大變化的"幅度"
+        var_max_dict[meas_param]=max(var_dict[meas_param],key=abs) #找出變化最大變化的"幅度"
         var_max_idxs[meas_param]=var_dict[meas_param].index(var_max_dict[meas_param])#    # 把變化最大的資料 的index 儲存起來
 
     # 把變化最大的資料 print 出來
@@ -69,20 +61,20 @@ def anlze_log_file(meas_params=[],aging_coffs=[],logfile=""):
     return data_dict,step_dict,var_dict,var_dict_percent,var_max_idxs,var_max_dict
 if __name__ == '__main__':
     if MAX_VARIATION_ANALY:
-        files = listdir("./result/{}".format(param_num))
-        meas_params = ["tr1", "tr2", "imax"]
+        files = listdir("./result/{}/{}".format(device_name,param_num))
+        meas_params = ["tr1","tr2","imax","vth"]
         aging_coffs = ["tol1"]
         var_max_idxs={}
         one_max_variation={}
         max_variations={"measure_value":[],"measure_name":[],"param_name":[]}
-        param_sel="imax"
+        param_sel="vth"
 
         for f_idx, f in enumerate(files):
             pass
             print(f)
-            logfile = "./result/{}/".format(param_num)+f
+            logfile = "./result/{}/{}/".format(device_name,param_num)+f
             data_dict, step_dict,var_dict,var_dict_percent,var_max_idxs,var_max_dict= anlze_log_file(meas_params=meas_params,aging_coffs=aging_coffs,logfile=logfile)
-            pattern = re.compile(r"r8002cnd3_(.*).log")
+            pattern = re.compile(r"%s_(.*).log"%device_name)
             mod_par=re.search(pattern,f)
             # if [var_max_dict[meas_param]for meas_param in meas_params]!=[0,0,0]:#納入繪圖條件設置[0,0,0]代表三個量測值皆無變化不與討論
             if var_max_dict[param_sel]!=0 and mod_par.group(1) not in ["MOS_N_L","MOS_N_W"]:#濾出 imax 不等於0的資訊 撇除不要考慮的 parameter
@@ -92,8 +84,9 @@ if __name__ == '__main__':
 
         df=pd.DataFrame(max_variations)
 
-        one_max_variation["measure_value"] = [x for x,m_name in zip(max_variations["measure_value"],max_variations["measure_name"]) if m_name == param_sel]
+        one_max_variation["measure_value"] = [round(x,3) for x,m_name in zip(max_variations["measure_value"],max_variations["measure_name"]) if m_name == param_sel]
         one_max_variation["param_name"] = [x for x,m_name in zip(max_variations["param_name"],max_variations["measure_name"]) if m_name == param_sel]
+
         df2 = pd.DataFrame(one_max_variation)
         df2=df2.sort_values("measure_value")
 
@@ -119,6 +112,7 @@ if __name__ == '__main__':
         _, xlabels = plt.xticks()
         ax_s.set_xticklabels(xlabels, size=12)
         ax_s.set_yticklabels(ax_s.get_yticks(), size=15)
+        ax_s.yaxis.set_major_formatter(FormatStrFormatter('%.2f'))
         ax.set_title(param_sel+" v.s. Aging parameter", fontsize=20)
         plt.show()
 
@@ -135,8 +129,10 @@ if __name__ == '__main__':
         fig, ax = plt.subplots(1,1,figsize=(20, 10))
         one_variation={}
         one_variation["imax"]=var_dict_percent["imax"]
+
         one_variation["tol1"] =[x+1for x in step_dict["tol1"]]
         one_variation["tol2"] =[x+1for x in step_dict["tol2"]]
+
         one_variation=pd.DataFrame(one_variation)
         one_variation=one_variation.pivot(columns ="tol2",index="tol1",values="imax") #df.value 為二為矩陣 先是column 資料排完才會再往下一條row 進行排列資料 df.values[0] 為一整條ROW的資料
 
@@ -167,58 +163,78 @@ if __name__ == '__main__':
 
 
     if DRAW_1:
-        logfile = "./result/1/r8002cnd3_MOS_N_TOX.log"
-        pattern = re.compile(r"r8002cnd3_(.*).log")
+        logfile = "./result/{}/1/{}_MOS_N_VTO.log".format(device_name,device_name)
+        pattern = re.compile(r"{}_(.*).log".format(device_name))
         mod_par = re.search(pattern,logfile)
-        meas_params = ["tr1", "tr2", "imax"]
+        meas_params = ["tr1", "tr2", "imax","vth"]
+        title_ll=["rise time (%)","fall time (%)","Drain current (%)","Vth(%)"]
         aging_coffs = ["tol1"]
         data_dict, step_dict,var_dict,var_dict_percent,var_max_idxs,var_max_dict=anlze_log_file(meas_params=meas_params,aging_coffs=aging_coffs,logfile=logfile)
-        step_list=[x+1for x in step_dict["tol1"]]
+        step_list=[x+1for x in step_dict[aging_coffs[0]]]
 
-        y_low=-50
-        y_high=150
-        fig,axes=plt.subplots(1,3,figsize=(20, 10))
-        #繪製模擬時間內的最大電流
-        color = sns.color_palette("Set1")
-        # sns.set()
-        axes[0].plot(step_list,var_dict_percent["imax"],color=color[0] )
-        axes[0].plot(step_list[var_max_idxs["imax"]],var_dict_percent["imax"][var_max_idxs["imax"]],marker="*",color="black",markersize=10)
-        axes[0].text(step_list[var_max_idxs["imax"]], var_dict_percent["imax"][var_max_idxs["imax"]], "%.3f"%var_dict_percent["imax"][var_max_idxs["imax"]]+" %\n\n", fontsize=12, color="k", style="italic", weight="bold", verticalalignment='center',horizontalalignment='right', rotation=0)
-        axes[0].yaxis.set_major_locator(MaxNLocator(5))
-        axes[0].xaxis.set_major_locator(MaxNLocator(5))
-        axes[0].set_xlabel(mod_par.group(1)+" variation(rate)",fontsize=15)
-        axes[0].set_title("Drain current (%)",fontsize=20)
-        axes[0].tick_params(axis='x', labelsize=15)
-        axes[0].tick_params(axis='y', labelsize=15)
-        # axes[0].set_ylim(min(data_dict["imax"]),max(data_dict["imax"]))
-        axes[0].set_xlim(1.00,2.00)
-        axes[0].yaxis.grid()
-        axes[0].set_ylim(y_low,y_high)
-        #繪製模擬時間內的rise time
-        axes[1].plot(step_list,var_dict_percent["tr1"],color=color[1])
-        axes[1].plot(step_list[var_max_idxs["tr1"]],var_dict_percent["tr1"][var_max_idxs["tr1"]],marker="*",color="black",markersize=10)
-        axes[1].text(step_list[var_max_idxs["tr1"]], var_dict_percent["tr1"][var_max_idxs["tr1"]],"%.3f" % var_dict_percent["tr1"][var_max_idxs["tr1"]] + " %\n\n", fontsize=12, color="k",style="italic", weight="bold", verticalalignment='center', horizontalalignment='right', rotation=0)
-        axes[1].yaxis.set_major_locator(MaxNLocator(5))
-        axes[1].xaxis.set_major_locator(MaxNLocator(5))
-        axes[1].set_xlabel(mod_par.group(1)+" variation(rate)",fontsize=15)
-        axes[1].set_title("rise time (%) ",fontsize=20)
-        axes[1].tick_params(axis='x', labelsize=15)
-        axes[1].tick_params(axis='y', labelsize=15)
-        # axes[1].set_ylim(min(data_dict["tr1"]),max(data_dict["tr1"]))
-        axes[1].yaxis.grid()
-        axes[1].set_ylim(y_low,y_high)
-        #繪製模擬時間內的fall time
-        axes[2].plot(step_list,var_dict_percent["tr2"],color=color[2] )
-        axes[2].plot(step_list[var_max_idxs["tr2"]],var_dict_percent["tr2"][var_max_idxs["tr2"]],marker="*",color="black",markersize=10)
-        axes[2].text(step_list[var_max_idxs["tr2"]], var_dict_percent["tr2"][var_max_idxs["tr2"]],"%.3f" % var_dict_percent["tr2"][var_max_idxs["tr2"]] + " %\n\n", fontsize=12, color="k",style="italic", weight="bold", verticalalignment='center', horizontalalignment='right', rotation=0)
-        axes[2].yaxis.set_major_locator(MaxNLocator(5))
-        axes[2].xaxis.set_major_locator(MaxNLocator(5))
-        axes[2].set_xlabel(mod_par.group(1)+" variation(rate)",fontsize=15)
-        axes[2].set_title("fall time (%)",fontsize=20)
-        axes[2].tick_params(axis='x', labelsize=15)
-        axes[2].tick_params(axis='y', labelsize=15)
-        # axes[2].set_ylim(min(data_dict["tr2"]),max(data_dict["tr2"]))
-        axes[2].yaxis.grid()
-        axes[2].set_ylim(y_low,y_high)
+        y_low=min([x for k in var_dict_percent.values() for x in k ])-5
+        y_high=max([x for k in var_dict_percent.values() for x in k ])+5
+
+        fig,axes=plt.subplots(1,len(meas_params),figsize=(20, 10))
+        for idx,(indicator,title) in enumerate(zip(meas_params,title_ll)):
+            color = sns.color_palette("Set1")
+            # sns.set()
+
+            axes[idx].plot(step_list,var_dict_percent[indicator],color=color[idx] )
+            axes[idx].plot(step_list[var_max_idxs[indicator]],var_dict_percent[indicator][var_max_idxs[indicator]],marker="*",color="black",markersize=10)
+            axes[idx].text(step_list[var_max_idxs[indicator]], var_dict_percent[indicator][var_max_idxs[indicator]], "%.3f"%var_dict_percent[indicator][var_max_idxs[indicator]]+" %\n\n", fontsize=12, color="k", style="italic", weight="bold", verticalalignment='center',horizontalalignment='right', rotation=0)
+            axes[idx].yaxis.set_major_locator(MaxNLocator(5))
+            axes[idx].xaxis.set_major_locator(MaxNLocator(5))
+            axes[idx].set_xlabel(mod_par.group(1)+" variation(rate)",fontsize=15)
+            axes[idx].set_title(title,fontsize=20)
+            axes[idx].tick_params(axis='x', labelsize=15)
+            axes[idx].tick_params(axis='y', labelsize=15)
+            # axes[idx].set_ylim(min(data_dict["imax"]),max(data_dict["imax"]))
+            axes[idx].set_xlim(1.00,max(step_list))
+            axes[idx].yaxis.grid()
+            axes[idx].set_ylim(y_low,y_high)
+
+        # #繪製模擬時間內的最大電流
+        # color = sns.color_palette("Set1")
+        # # sns.set()
+        # axes[0].plot(step_list,var_dict_percent["imax"],color=color[0] )
+        # axes[0].plot(step_list[var_max_idxs["imax"]],var_dict_percent["imax"][var_max_idxs["imax"]],marker="*",color="black",markersize=10)
+        # axes[0].text(step_list[var_max_idxs["imax"]], var_dict_percent["imax"][var_max_idxs["imax"]], "%.3f"%var_dict_percent["imax"][var_max_idxs["imax"]]+" %\n\n", fontsize=12, color="k", style="italic", weight="bold", verticalalignment='center',horizontalalignment='right', rotation=0)
+        # axes[0].yaxis.set_major_locator(MaxNLocator(5))
+        # axes[0].xaxis.set_major_locator(MaxNLocator(5))
+        # axes[0].set_xlabel(mod_par.group(1)+" variation(rate)",fontsize=15)
+        # axes[0].set_title("Drain current (%)",fontsize=20)
+        # axes[0].tick_params(axis='x', labelsize=15)
+        # axes[0].tick_params(axis='y', labelsize=15)
+        # # axes[0].set_ylim(min(data_dict["imax"]),max(data_dict["imax"]))
+        # axes[0].set_xlim(1.00,2.00)
+        # axes[0].yaxis.grid()
+        # axes[0].set_ylim(y_low,y_high)
+        # #繪製模擬時間內的rise time
+        # axes[1].plot(step_list,var_dict_percent["tr1"],color=color[1])
+        # axes[1].plot(step_list[var_max_idxs["tr1"]],var_dict_percent["tr1"][var_max_idxs["tr1"]],marker="*",color="black",markersize=10)
+        # axes[1].text(step_list[var_max_idxs["tr1"]], var_dict_percent["tr1"][var_max_idxs["tr1"]],"%.3f" % var_dict_percent["tr1"][var_max_idxs["tr1"]] + " %\n\n", fontsize=12, color="k",style="italic", weight="bold", verticalalignment='center', horizontalalignment='right', rotation=0)
+        # axes[1].yaxis.set_major_locator(MaxNLocator(5))
+        # axes[1].xaxis.set_major_locator(MaxNLocator(5))
+        # axes[1].set_xlabel(mod_par.group(1)+" variation(rate)",fontsize=15)
+        # axes[1].set_title("rise time (%) ",fontsize=20)
+        # axes[1].tick_params(axis='x', labelsize=15)
+        # axes[1].tick_params(axis='y', labelsize=15)
+        # # axes[1].set_ylim(min(data_dict["tr1"]),max(data_dict["tr1"]))
+        # axes[1].yaxis.grid()
+        # axes[1].set_ylim(y_low,y_high)
+        # #繪製模擬時間內的fall time
+        # axes[2].plot(step_list,var_dict_percent["tr2"],color=color[2] )
+        # axes[2].plot(step_list[var_max_idxs["tr2"]],var_dict_percent["tr2"][var_max_idxs["tr2"]],marker="*",color="black",markersize=10)
+        # axes[2].text(step_list[var_max_idxs["tr2"]], var_dict_percent["tr2"][var_max_idxs["tr2"]],"%.3f" % var_dict_percent["tr2"][var_max_idxs["tr2"]] + " %\n\n", fontsize=12, color="k",style="italic", weight="bold", verticalalignment='center', horizontalalignment='right', rotation=0)
+        # axes[2].yaxis.set_major_locator(MaxNLocator(5))
+        # axes[2].xaxis.set_major_locator(MaxNLocator(5))
+        # axes[2].set_xlabel(mod_par.group(1)+" variation(rate)",fontsize=15)
+        # axes[2].set_title("fall time (%)",fontsize=20)
+        # axes[2].tick_params(axis='x', labelsize=15)
+        # axes[2].tick_params(axis='y', labelsize=15)
+        # # axes[2].set_ylim(min(data_dict["tr2"]),max(data_dict["tr2"]))
+        # axes[2].yaxis.grid()
+        # axes[2].set_ylim(y_low,y_high)
 
         plt.show()

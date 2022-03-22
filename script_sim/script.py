@@ -3,7 +3,7 @@
 parsing 能做到的事 事修改特定一行資料 進行 rewrite
 for 單個 parameter 的模擬
 每次修改 必須修改兩處 一是要進行 step 模擬的 param 二是上次修改的param 須改回來
-{
+記得先存檔 再執行!!!!!!!!!!!!!!!!!!!!!
     modelname :
     [
         {
@@ -23,7 +23,9 @@ from os import listdir
 from os.path import isfile, isdir, join
 CLEAR_LIB_FILE=True
 CLEAR_RESULT_FILE=False
+SCRIPTING_SIM=False
 param_num=2# LTSPICE 電路檔記得要調整
+device_name="rd3l050sn"
 
 def spice_data_anlyz(input_lib=""):
     spice_txt = open(input_lib,'r') #放置lib 檔的地方
@@ -48,7 +50,6 @@ def spice_data_anlyz(input_lib=""):
 
         if model_name is not None :
             model_names.append(model_name.group(1))
-
 
         if (model_name is not None or end_bool is not None):
             if(flag > 0):
@@ -128,7 +129,7 @@ def ajst_lib_content(mod_par_dict={},now_par_idxs=[],input_lib=""):
         output_file_str = output_file_str.join(["_" + str(list(now_par_idx.keys())[0]) + "_" + str(now_par_idx["par_name"]) for now_par_idx in now_par_idxs])
     spice_txt.close()
 
-    output_file="./lib/{}/r8002cnd3".format(param_num)+output_file_str+".lib"
+    output_file="./lib/{}/{}/{}".format(device_name,param_num,device_name)+output_file_str+".lib"
     spice_txt = open(output_file, 'a+')
     spice_txt.write("".join(string_list))
     spice_txt.close()
@@ -137,44 +138,44 @@ def ajst_lib_content(mod_par_dict={},now_par_idxs=[],input_lib=""):
 
 if __name__ == '__main__':
     if CLEAR_LIB_FILE:
-        path_to_dir = "./lib/{}".format(param_num)
+        path_to_dir = "./lib/{}/{}".format(device_name,param_num)
         if (os.path.isdir(path_to_dir)):
             shutil.rmtree(path_to_dir)
         os.mkdir(path_to_dir)
     if CLEAR_RESULT_FILE:
-        path_to_dir = "./result/{}".format(param_num)
+        path_to_dir = "./result/{}/{}".format(device_name,param_num)
         if (os.path.isdir(path_to_dir)):
             shutil.rmtree(path_to_dir)
         os.mkdir(path_to_dir)
+    if CLEAR_LIB_FILE:
+        input_lib = r"C:\Users\user\Documents\LTspiceXVII\file\LIB\%s_copy.lib"%device_name
+        last_pars, mod_par_dict=spice_data_anlyz(input_lib=input_lib)
 
-    input_lib = r"C:\Users\user\Documents\LTspiceXVII\file\LIB\r8002cnd3_copy.lib"
-    last_pars, mod_par_dict=spice_data_anlyz(input_lib=input_lib)
+        now_par_idxs_ll=[]
+        now_par_ll     =[]
+        # 單筆參數當成parameter injection
+        # for model in mod_par_dict.keys():
+        #     now_par_idxs_ll=now_par_idxs_ll+[[{model:param_index,"par_name":param_info["par_name"]}]for param_index,param_info in enumerate(mod_par_dict[model])]
+        for model in mod_par_dict.keys():
+            now_par_idxs_ll=now_par_idxs_ll+[{model:param_index,"par_name":param_info["par_name"]}for param_index,param_info in enumerate(mod_par_dict[model])]
 
-    now_par_idxs_ll=[]
-    now_par_ll     =[]
-    # 單筆參數當成parameter injection
-    # for model in mod_par_dict.keys():
-    #     now_par_idxs_ll=now_par_idxs_ll+[[{model:param_index,"par_name":param_info["par_name"]}]for param_index,param_info in enumerate(mod_par_dict[model])]
-    for model in mod_par_dict.keys():
-        now_par_idxs_ll=now_par_idxs_ll+[{model:param_index,"par_name":param_info["par_name"]}for param_index,param_info in enumerate(mod_par_dict[model])]
+        now_par_idxs_ll=list(permutations(now_par_idxs_ll,param_num))
 
-    now_par_idxs_ll=list(permutations(now_par_idxs_ll,2))
+        for index,now_par_idxs in enumerate(now_par_idxs_ll):
+            ajst_lib_content(mod_par_dict=mod_par_dict,
+                             now_par_idxs=now_par_idxs,
+                             input_lib=input_lib)
 
-    for index,now_par_idxs in enumerate(now_par_idxs_ll):
-        ajst_lib_content(mod_par_dict=mod_par_dict,
-                         now_par_idxs=now_par_idxs,
-                         input_lib=input_lib)
-    ##scripting 跑 ltspice 模擬
-    # files = listdir("./lib/{}".format(param_num))# 選擇是要模擬 inject 多少個 aging parameter
-    # for f_idx,f in enumerate(files):
-    #     print("{} IS UNDER SIMULATION...................{} % ".format(f,float((f_idx+1)/len(files)*100)))
-    #     shutil.copyfile("./lib/"+f,r"C:\Users\user\Documents\LTspiceXVII\file\LIB\r8002cnd3.lib")
-    #     pattern=re.compile(r"(.+).lib")
-    #     log_name= re.search(pattern,f)
-    #     LTC = SimCommander(r"C:\Users\user\Documents\LTspiceXVII\file\Montecarlo\monte_SiC.asc")
-    #     LTC.run()
-    #     LTC.wait_completion()
-    #     shutil.copyfile(r"C:\Users\user\Documents\LTspiceXVII\file\Montecarlo\monte_SiC_1.log", "./result/{}/".format(param_num)+str(log_name.group(1))+".log")
-    #     break
-    #
+    #scripting 跑 ltspice 模擬
+    if SCRIPTING_SIM:
+        files = listdir("./lib/{}/{}".format(device_name,param_num))# 選擇是要模擬 inject 多少個 aging parameter
+        for f_idx,f in enumerate(files):
+            print("{} IS UNDER SIMULATION...................{} % ".format(f,float((f_idx+1)/len(files)*100)))
+            shutil.copyfile("./lib/{}/{}/".format(device_name,param_num)+f,r"C:\Users\user\Documents\LTspiceXVII\file\LIB\%s.lib"%device_name)
+            pattern=re.compile(r"(.+).lib")
+            log_name= re.search(pattern,f)
+            LTC = SimCommander(r"C:\Users\user\Documents\LTspiceXVII\file\Montecarlo\monte_SiC.asc")
+            LTC.run()
+            LTC.wait_completion()
+            shutil.copyfile(r"C:\Users\user\Documents\LTspiceXVII\file\Montecarlo\monte_SiC_1.log", "./result/{}/{}/".format(device_name,param_num)+str(log_name.group(1))+".log")
     ##scripting 跑 ltspice 模擬
