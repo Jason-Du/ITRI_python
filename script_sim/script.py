@@ -23,8 +23,8 @@ from itertools import permutations
 from os import listdir
 from os.path import isfile, isdir, join
 CLEAR_LIB_FILE=False
-CLEAR_RESULT_FILE=True
-SCRIPTING_SIM=CLEAR_RESULT_FILE
+CLEAR_RESULT_FILE=False
+SCRIPTING_SIM=True
 param_num=1# LTSPICE 電路檔記得要調整
 device_name="rd3l050sn"
 

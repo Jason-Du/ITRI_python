@@ -8,10 +8,11 @@ import pandas as pd
 import numpy as np
 from matplotlib.ticker import FormatStrFormatter
 DRAW_1=False
-DRAW_2=False
-MAX_VARIATION_ANALY=True
+DRAW_2=True
+MAX_VARIATION_ANALY=False
 param_num=1
 device_name="rd3l050sn"
+test_condition="10Vg_40Vds_10A"
 def anlze_log_file(meas_params=[],aging_coffs=[],logfile=""):
     # "./result/r8002cnd3_MOS_N_L.log"
     # "monte_SiC.log"
@@ -61,18 +62,18 @@ def anlze_log_file(meas_params=[],aging_coffs=[],logfile=""):
     return data_dict,step_dict,var_dict,var_dict_percent,var_max_idxs,var_max_dict
 if __name__ == '__main__':
     if MAX_VARIATION_ANALY:
-        files = listdir("./result/{}/{}".format(device_name,param_num))
+        files = listdir("./result/{}/{}/{}".format(device_name,test_condition,param_num))
         meas_params = ["tr1","tr2","imax","vth"]
         aging_coffs = ["tol1"]
         var_max_idxs={}
         one_max_variation={}
         max_variations={"measure_value":[],"measure_name":[],"param_name":[]}
-        param_sel="vth"
+        param_sel="imax"
 
         for f_idx, f in enumerate(files):
             pass
             print(f)
-            logfile = "./result/{}/{}/".format(device_name,param_num)+f
+            logfile = "./result/{}/{}/{}/".format(device_name,test_condition,param_num)+f
             data_dict, step_dict,var_dict,var_dict_percent,var_max_idxs,var_max_dict= anlze_log_file(meas_params=meas_params,aging_coffs=aging_coffs,logfile=logfile)
             pattern = re.compile(r"%s_(.*).log"%device_name)
             mod_par=re.search(pattern,f)
@@ -119,22 +120,27 @@ if __name__ == '__main__':
 
     # 繪製曲線圖 橫縱軸都是以增加幅度繪製
     if DRAW_2:
-        logfile = "monte_SiC.log"
+        # "monte_SiC_rd31050sn.log"
+        #
+        logfile ="VTO_GAMMA_r8002cnd3.log"
         meas_params = ["tr1", "tr2", "imax"]
         aging_coffs = ["tol1","tol2"]
-        threshold_value=10# 以5來說 是5% 決定後續繪圖 +- 5 5 的範圍
+        title_ll = ["rise time (%)", "fall time (%)", "Ids (%)", "Vth(%)"]
+        threshold_value=11# 以5來說 是5% 決定後續繪圖 +- 5 5 的範圍
+        sel_param="imax"
+        inject_param=["VTO","GAMMA  "]
         data_dict, step_dict, var_dict, var_dict_percent, var_max_idxs, var_max_dict = anlze_log_file(meas_params=meas_params, aging_coffs=aging_coffs, logfile=logfile)
 
         palette_1=sns.color_palette("hls", 8)
         fig, ax = plt.subplots(1,1,figsize=(20, 10))
         one_variation={}
-        one_variation["imax"]=var_dict_percent["imax"]
+        one_variation[sel_param]=var_dict_percent[sel_param]
 
         one_variation["tol1"] =[x+1for x in step_dict["tol1"]]
         one_variation["tol2"] =[x+1for x in step_dict["tol2"]]
 
         one_variation=pd.DataFrame(one_variation)
-        one_variation=one_variation.pivot(columns ="tol2",index="tol1",values="imax") #df.value 為二為矩陣 先是column 資料排完才會再往下一條row 進行排列資料 df.values[0] 為一整條ROW的資料
+        one_variation=one_variation.pivot(columns ="tol2",index="tol1",values=sel_param) #df.value 為二為矩陣 先是column 資料排完才會再往下一條row 進行排列資料 df.values[0] 為一整條ROW的資料
 
         rows, cols=np.where(one_variation==0)#return  原點 index
         ax.plot(rows,cols,marker="*",color="black", markersize=10)#標記原點
@@ -149,15 +155,15 @@ if __name__ == '__main__':
         ax.plot(col_set, row_ground,color=palette_1[1])
 
         palette_2 = sns.color_palette("rocket", as_cmap=True)
-        ax_s = sns.heatmap(one_variation,xticklabels=10,yticklabels=10,cmap="YlGnBu",cbar_kws={"orientation":"vertical","label":"Max(ID) variation (%)","location":"right",'ticks': [40,20,5, 0, -5, -20,-40, -60,-80]})
+        ax_s = sns.heatmap(one_variation,xticklabels=10,yticklabels=10,cmap="YlGnBu",cbar_kws={"orientation":"vertical","label":"%s variation"%title_ll[2],"location":"right",'ticks': [40,20,5, 0, -5, -20,-40, -60,-80]})
         ax_s.set_xticklabels(ax_s.get_xmajorticklabels(), fontsize = 15)
         ax_s.set_yticklabels(ax_s.get_ymajorticklabels(), fontsize = 15)
         ax_s.figure.axes[-1].yaxis.label.set_size(18)
         cbar =ax_s.collections[0].colorbar
         cbar.ax.tick_params(labelsize=15)
-        ax.set_ylabel("MOS_N VTO variation(rate)", fontsize=18)
-        ax.set_xlabel("MOS_N GAMMA variation(rate)", fontsize=18)
-        ax.set_title("Max(ID) variation v.s. MOS_N GAMMA / MOS_N VTO",fontsize=20)
+        ax.set_ylabel("%s variation(rate)"%inject_param[0], fontsize=18)
+        ax.set_xlabel("%s variation(rate)"%inject_param[1], fontsize=18)
+        ax.set_title(" {} variation v.s. {} / {} Variation".format(title_ll[2],inject_param[0],inject_param[1]),fontsize=20)
         plt.show()
 
 
@@ -167,7 +173,7 @@ if __name__ == '__main__':
         pattern = re.compile(r"{}_(.*).log".format(device_name))
         mod_par = re.search(pattern,logfile)
         meas_params = ["tr1", "tr2", "imax","vth"]
-        title_ll=["rise time (%)","fall time (%)","Drain current (%)","Vth(%)"]
+        title_ll=["rise time (%)","fall time (%)","Ids (%)","Vth(%)"]
         aging_coffs = ["tol1"]
         data_dict, step_dict,var_dict,var_dict_percent,var_max_idxs,var_max_dict=anlze_log_file(meas_params=meas_params,aging_coffs=aging_coffs,logfile=logfile)
         step_list=[x+1for x in step_dict[aging_coffs[0]]]
