@@ -76,11 +76,17 @@ if __name__ == '__main__':
         # 原因是因為沒掉穩太狀態 所以能參考的資料 在模擬時間有限的狀況下(10ms) 僅能參考 7step 的資料資訊
         # set time (第 10 step) 之前 呈現 EXPONENTIAL GRAPH 式 的增長 driving 的能力變弱了 上升期 階段的流經電流慢慢隨著老化在下降
         # 上述原因導致了 需要比較長的時間來做 set up 進一步導致 diode 損壞 I peak avg break
+        # duty ratio 在前面7 step 模擬的 variation 算是可以接受
+        # ripple voltage 不適合拿來做為 一個 因為太過浮動 但當系統崩快時 output voltage 開始降低 拉不到 規格中的 42 V 也算是崩快的一種依據
+        # 指標警示 可選擇 set up time 指標警示系統 可訂 530%
+        # Switching 作為 指標警示系統 可訂 6.37%
+        # efficiency 在前面9個step 變化不明顯 是因為 系統利用 條大佔空比 去彌補 trade -off switching loss 增加
+
 
         meas_params = ["p_sw","voutpp","eff","t_set","duty_ratio","vout_avg"]
         aging_coffs = ["tol1"]
         title_ll = ["switching loss (%)", "ripple voltage (%)", "efficiency(%)","set up time (%)","switching on\nduty ratio (%)","output voltage(%)"]
-        tol_range1= [0,10]
+        tol_range1= [0,9]
         data_dict, step_dict,var_dict,var_dict_percent,var_max_idxs,var_max_dict=anlze_log_file(meas_params=meas_params,
                                                                                                 aging_coffs=aging_coffs,
                                                                                                 logfile="./result/LTC1871-7_F09.log",
