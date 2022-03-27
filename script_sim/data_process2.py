@@ -8,12 +8,16 @@ import pandas as pd
 import numpy as np
 from matplotlib.ticker import FormatStrFormatter
 DRAW_1=False
-DRAW_2=True
+DRAW_2=False
 MAX_VARIATION_ANALY=False
+CIRCUIT_ANALY=True
 param_num=1
-device_name="rd3l050sn"
-test_condition="10Vg_40Vds_10A"
-def anlze_log_file(meas_params=[],aging_coffs=[],logfile=""):
+device_name="rcj510n25"
+# "rd3l050sn"
+test_condition="10Vg_40Vds_5.5R"
+
+def anlze_log_file(meas_params=[],aging_coffs=[],logfile="",tol_range=[0,50]):
+    # range 的設計是 為了縮小繪圖的區間範圍 若 step 是 100 simulation 0.01 per step 則 [0,50] 可以模擬出 1~1.5 倍的模擬結果
     # "./result/r8002cnd3_MOS_N_L.log"
     # "monte_SiC.log"
     # print("Number of steps  :", data.step_count)
@@ -29,18 +33,21 @@ def anlze_log_file(meas_params=[],aging_coffs=[],logfile=""):
 
     ref = {}
     for aging_coff in aging_coffs:
-        step_dict[aging_coff]=[float("%.2f"%x) for x in data[aging_coff]]#因為在spice 的模擬過程中 1 step 為 0.01 精度故調整為0.2f
+        step_dict[aging_coff]=[float("%.2f"%x) for x in data[aging_coff][tol_range[0]:tol_range[1]]]#因為在spice 的模擬過程中 1 step 為 0.01 精度故調整為0.2f
 
     step_size=len(step_dict[aging_coff])
     step_dict_bool = np.array([True] *step_size)
     for aging_coff in aging_coffs:
-        step_dict_bool= step_dict_bool & np.array([float(i)==0.0 for i in step_dict[aging_coff]])
+        step_dict_bool= step_dict_bool & np.array([float(i)==0.0 for i in step_dict[aging_coff][tol_range[0]:tol_range[1]]])
         # print(step_dict_bool)
     ref_idx=np.where(step_dict_bool == True)
 
     for meas_param in meas_params:
-        data_dict[meas_param]=data[meas_param]
+        data_dict[meas_param]=data[meas_param][tol_range[0]:tol_range[1]]
         ref[meas_param]=data_dict[meas_param][ref_idx[0][0]]
+    # duty ratio 需要特別處理 因為 spice 可能抓到 的是 duty on ratio 或是 1+duty_on ratio 查看 spice script 檔能有所理解
+    if "duty_ratio"  in meas_params:
+        data_dict["duty_ratio"]=[i if i<=1 else i-1 for i in data_dict["duty_ratio"] ]
 
     var_dict = {}
     var_max_dict = {}
@@ -49,7 +56,7 @@ def anlze_log_file(meas_params=[],aging_coffs=[],logfile=""):
     #以第一筆資料當作比較依據 後需資料除以 第一筆資料 查看其變化幅度 <1 為減少 >1 為增加
     for meas_param in meas_params:
         data_dict[meas_param]= [float(x/ref[meas_param]) for x in data_dict[meas_param]]
-        var_dict[meas_param]=[ x-1 for x in data_dict[meas_param] ]    #資料全部減1 獲取變化的"幅度" <0 為減少 >0 為增加
+        var_dict[meas_param]=[ x-1 for x in data_dict[meas_param]]    #資料全部減1 獲取變化的"幅度" <0 為減少 >0 為增加
         var_dict_percent[meas_param] = [x*100 for x in var_dict[meas_param]]
         var_max_dict[meas_param]=max(var_dict[meas_param],key=abs) #找出變化最大變化的"幅度"
         var_max_idxs[meas_param]=var_dict[meas_param].index(var_max_dict[meas_param])#    # 把變化最大的資料 的index 儲存起來
@@ -61,6 +68,65 @@ def anlze_log_file(meas_params=[],aging_coffs=[],logfile=""):
 
     return data_dict,step_dict,var_dict,var_dict_percent,var_max_idxs,var_max_dict
 if __name__ == '__main__':
+    if CIRCUIT_ANALY:
+        # 在分析的過程中 若今天"rcj510n25" device 取 VTO 為影響 threshold voltage 的主要因素 下去模擬 25step 0.01 rate/step
+        # switching loss 在 第7 次模擬結果後 升的超級高(第 10 step) 原因是因為站空比拉大 (90%) P_Sw 的 spice 的 script 裡面是 V*I 沒有足夠的時間下降 導製 ZVS ZCS 失去效用
+        # switching loss (第 10 step) 之後開始劇降 原因是因為 output voltage 開始降低 拉不到 規格中的 42 V
+        #會發現系統後半段 的模擬 efficiency掉得很快 是因為 電壓已經拉不上去 拉不到 規格中的 42 V
+        # 原因是因為沒掉穩太狀態 所以能參考的資料 在模擬時間有限的狀況下(10ms) 僅能參考 7step 的資料資訊
+        # set time (第 10 step) 之前 呈現 EXPONENTIAL GRAPH 式 的增長 driving 的能力變弱了 上升期 階段的流經電流慢慢隨著老化在下降
+        # 上述原因導致了 需要比較長的時間來做 set up 進一步導致 diode 損壞 I peak avg break
+
+        meas_params = ["p_sw","voutpp","eff","t_set","duty_ratio","vout_avg"]
+        aging_coffs = ["tol1"]
+        title_ll = ["switching loss (%)", "ripple voltage (%)", "efficiency(%)","set up time (%)","switching on\nduty ratio (%)","output voltage(%)"]
+        tol_range1= [0,10]
+        data_dict, step_dict,var_dict,var_dict_percent,var_max_idxs,var_max_dict=anlze_log_file(meas_params=meas_params,
+                                                                                                aging_coffs=aging_coffs,
+                                                                                                logfile="./result/LTC1871-7_F09.log",
+                                                                                                tol_range=tol_range1)
+        # ########################將 step 的 param variation 轉為觀測用 的指標 VTO (%) -->threshold voltage (%)
+        meas_params2 = ["tr1", "tr2", "imax","vth"]
+        aging_coffs2 = ["tol1"]
+        param_sel = "vth"
+        tol_range2 =[0,50]
+        logfile2 = "./result/{}/{}/1/{}_MOS_N_VTO.log".format(device_name, test_condition, device_name)
+        data_dict2, step_dict2,var_dict2,var_dict_percent2,var_max_idxs2,var_max_dict2=anlze_log_file(meas_params=meas_params2,
+                                                                                                aging_coffs=aging_coffs2,
+                                                                                                logfile=logfile2,
+                                                                                                tol_range=tol_range2
+                                                                                                )
+        # ######################################
+
+        step_list = var_dict_percent2[param_sel][tol_range1[0]:tol_range1[1]]
+        y_low = min([x for k in var_dict_percent.values() for x in k]) - 5
+        y_high = max([x for k in var_dict_percent.values() for x in k]) + 5
+        fig, axes = plt.subplots(1, len(meas_params), figsize=(20, 10))
+        sns.set(context='notebook', style='whitegrid')
+        for idx, (indicator, title) in enumerate(zip(meas_params, title_ll)):
+            color = sns.color_palette("tab10")
+            y_low = min(var_dict_percent[indicator]) - 5
+            y_high = max(var_dict_percent[indicator]) + 5
+
+            axes[idx].plot(step_list, var_dict_percent[indicator], color=color[idx])
+            axes[idx].plot(step_list[var_max_idxs[indicator]], var_dict_percent[indicator][var_max_idxs[indicator]],
+                           marker="*", color="black", markersize=10)
+            axes[idx].text(step_list[var_max_idxs[indicator]], var_dict_percent[indicator][var_max_idxs[indicator]],
+                           "\n\n%.2f" % var_dict_percent[indicator][var_max_idxs[indicator]] + "%\n\n", fontsize=12,
+                           color="k", style="italic", weight="bold", verticalalignment='center',
+                           horizontalalignment='right', rotation=0)
+            axes[idx].yaxis.set_major_locator(MaxNLocator(5))
+            axes[idx].xaxis.set_major_locator(MaxNLocator(5))
+            axes[idx].set_xlabel("Vth" + " variation(%)", fontsize=15)
+            axes[idx].set_title(title, fontsize=20)
+            axes[idx].tick_params(axis='x', labelsize=15)
+            axes[idx].tick_params(axis='y', labelsize=15)
+            # axes[idx].set_ylim(min(data_dict["imax"]),max(data_dict["imax"]))
+            axes[idx].set_xlim(0.00, max(step_list))
+            axes[idx].yaxis.grid()
+            axes[idx].set_ylim(y_low, y_high)
+        plt.show()
+
     if MAX_VARIATION_ANALY:
         files = listdir("./result/{}/{}/{}".format(device_name,test_condition,param_num))
         meas_params = ["tr1","tr2","imax","vth"]
@@ -68,13 +134,17 @@ if __name__ == '__main__':
         var_max_idxs={}
         one_max_variation={}
         max_variations={"measure_value":[],"measure_name":[],"param_name":[]}
-        param_sel="imax"
+        param_sel="vth"
 
         for f_idx, f in enumerate(files):
             pass
             print(f)
             logfile = "./result/{}/{}/{}/".format(device_name,test_condition,param_num)+f
-            data_dict, step_dict,var_dict,var_dict_percent,var_max_idxs,var_max_dict= anlze_log_file(meas_params=meas_params,aging_coffs=aging_coffs,logfile=logfile)
+            data_dict, step_dict,var_dict,var_dict_percent,var_max_idxs,var_max_dict= anlze_log_file(meas_params=meas_params,
+                                                                                                     aging_coffs=aging_coffs,
+                                                                                                     logfile=logfile,
+                                                                                                     tol_range=[0,50]
+                                                                                                     )
             pattern = re.compile(r"%s_(.*).log"%device_name)
             mod_par=re.search(pattern,f)
             # if [var_max_dict[meas_param]for meas_param in meas_params]!=[0,0,0]:#納入繪圖條件設置[0,0,0]代表三個量測值皆無變化不與討論
@@ -129,7 +199,11 @@ if __name__ == '__main__':
         threshold_value=11# 以5來說 是5% 決定後續繪圖 +- 5 5 的範圍
         sel_param="imax"
         inject_param=["VTO","GAMMA  "]
-        data_dict, step_dict, var_dict, var_dict_percent, var_max_idxs, var_max_dict = anlze_log_file(meas_params=meas_params, aging_coffs=aging_coffs, logfile=logfile)
+        data_dict, step_dict, var_dict, var_dict_percent, var_max_idxs, var_max_dict = anlze_log_file(meas_params=meas_params,
+                                                                                                      aging_coffs=aging_coffs,
+                                                                                                      logfile=logfile,
+                                                                                                      tol_range=[0,100]
+                                                                                                      )
 
         palette_1=sns.color_palette("hls", 8)
         fig, ax = plt.subplots(1,1,figsize=(20, 10))
@@ -169,13 +243,17 @@ if __name__ == '__main__':
 
 
     if DRAW_1:
-        logfile = "./result/{}/1/{}_MOS_N_VTO.log".format(device_name,device_name)
+        logfile = "./result/{}/{}/1/{}_MOS_N_VTO.log".format(device_name,test_condition,device_name)
         pattern = re.compile(r"{}_(.*).log".format(device_name))
         mod_par = re.search(pattern,logfile)
         meas_params = ["tr1", "tr2", "imax","vth"]
         title_ll=["rise time (%)","fall time (%)","Ids (%)","Vth(%)"]
         aging_coffs = ["tol1"]
-        data_dict, step_dict,var_dict,var_dict_percent,var_max_idxs,var_max_dict=anlze_log_file(meas_params=meas_params,aging_coffs=aging_coffs,logfile=logfile)
+
+        data_dict, step_dict,var_dict,var_dict_percent,var_max_idxs,var_max_dict=anlze_log_file(meas_params=meas_params,
+                                                                                                aging_coffs=aging_coffs,
+                                                                                                logfile=logfile,
+                                                                                                tol_range=[0,50])
         step_list=[x+1for x in step_dict[aging_coffs[0]]]
 
         y_low=min([x for k in var_dict_percent.values() for x in k ])-5
@@ -184,11 +262,10 @@ if __name__ == '__main__':
         fig,axes=plt.subplots(1,len(meas_params),figsize=(20, 10))
         for idx,(indicator,title) in enumerate(zip(meas_params,title_ll)):
             color = sns.color_palette("Set1")
-            # sns.set()
 
             axes[idx].plot(step_list,var_dict_percent[indicator],color=color[idx] )
             axes[idx].plot(step_list[var_max_idxs[indicator]],var_dict_percent[indicator][var_max_idxs[indicator]],marker="*",color="black",markersize=10)
-            axes[idx].text(step_list[var_max_idxs[indicator]], var_dict_percent[indicator][var_max_idxs[indicator]], "%.3f"%var_dict_percent[indicator][var_max_idxs[indicator]]+" %\n\n", fontsize=12, color="k", style="italic", weight="bold", verticalalignment='center',horizontalalignment='right', rotation=0)
+            axes[idx].text(step_list[var_max_idxs[indicator]], var_dict_percent[indicator][var_max_idxs[indicator]], "\n\n%.2f"%var_dict_percent[indicator][var_max_idxs[indicator]]+"%\n\n", fontsize=12, color="k", style="italic", weight="bold", verticalalignment='center',horizontalalignment='right', rotation=0)
             axes[idx].yaxis.set_major_locator(MaxNLocator(5))
             axes[idx].xaxis.set_major_locator(MaxNLocator(5))
             axes[idx].set_xlabel(mod_par.group(1)+" variation(rate)",fontsize=15)

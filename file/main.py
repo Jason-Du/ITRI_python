@@ -62,6 +62,15 @@ import os
 # E=aging_AF_coff(A=-17.2,B=0.4,C=-0.15,Temp=D,Vgate=C,a=0)
 # print(E.shape)
 # fig,axes=plt.subplots(1,1,figsize=(20, 10))
-# load dataset
-
-
+# # load dataset
+# print(1/(260E-9))
+# print(1/(31E-9))
+# print(np.exp(6))
+# shape=np.array([1.2567,1.0727,1.45316]).reshape(1,-1)
+# scale=np.array([82.1,148,89.2]).reshape(1,-1)
+# x = np.linspace(0,3E2,1000).reshape(1,-1)
+# print(shape.shape)
+# print(x.shape)
+# print((scale.T*(x*shape.T)).shape)
+# print(np.log(10))
+print(6.13E-6/1.6061E-5)

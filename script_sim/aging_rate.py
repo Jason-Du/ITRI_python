@@ -377,9 +377,11 @@ def execution(Temp_dR=True,
         return df3
 if __name__ == '__main__':
     pass
-    MOSFET_SEL = 'MOSFET 36   '
-    df3=execution(dR_AGING=False,Temp_dR=True,MOSFET_SEL=MOSFET_SEL,COX_GATE=False,Temp_time=False)
+    # MOSFET_SEL = 'MOSFET 36   '
+    # df3=execution(dR_AGING=False,Temp_dR=True,MOSFET_SEL=MOSFET_SEL,COX_GATE=False,Temp_time=False)
+
     # data=df3[(df3.MOSFET == MOSFET_SEL) & (df3.AVG == "N") & (df3.temp >= 200)]
     # data.reset_index(inplace=True, drop=True)
     # data.index=data.index+1
     # print(data.index)
+    print(Calculate_MTTF(20000))

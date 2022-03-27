@@ -26,8 +26,10 @@ CLEAR_LIB_FILE=False
 CLEAR_RESULT_FILE=False
 SCRIPTING_SIM=True
 param_num=1# LTSPICE 電路檔記得要調整
-device_name="rd3l050sn"
-
+device_name="rcj510n25"
+test_condition="10Vg_40Vds_5.5R"
+# "rcj510n25"
+# "rd3l050sn"
 def spice_data_anlyz(input_lib=""):
     spice_txt = open(input_lib,'r') #放置lib 檔的地方
     pars=[] # 參數集合 小單元為 par_dict[{'par_name':///, 'par_val':///, 'idx':///}] #於for 迴圈中使用
@@ -142,12 +144,12 @@ if __name__ == '__main__':
         path_to_dir = "./lib/{}/{}".format(device_name,param_num)
         if (os.path.isdir(path_to_dir)):
             shutil.rmtree(path_to_dir)
-        os.mkdir(path_to_dir)
+        os.makedirs(path_to_dir)
     if CLEAR_RESULT_FILE:
-        path_to_dir = "./result/{}/{}".format(device_name,param_num)
+        path_to_dir = "./result/{}/{}/{}".format(device_name,test_condition,param_num)
         if (os.path.isdir(path_to_dir)):
             shutil.rmtree(path_to_dir)
-        os.mkdir(path_to_dir)
+        os.makedirs(path_to_dir)
     if CLEAR_LIB_FILE:
         input_lib = r"C:\Users\user\Documents\LTspiceXVII\file\LIB\%s_copy.lib"%device_name
         last_pars, mod_par_dict=spice_data_anlyz(input_lib=input_lib)
@@ -178,5 +180,5 @@ if __name__ == '__main__':
             LTC = SimCommander(r"C:\Users\user\Documents\LTspiceXVII\file\Montecarlo\monte_SiC.asc")
             LTC.run()
             LTC.wait_completion()
-            shutil.copyfile(r"C:\Users\user\Documents\LTspiceXVII\file\Montecarlo\monte_SiC_1.log", "./result/{}/{}/".format(device_name,param_num)+str(log_name.group(1))+".log")
+            shutil.copyfile(r"C:\Users\user\Documents\LTspiceXVII\file\Montecarlo\monte_SiC_1.log", "./result/{}/{}/{}/".format(device_name,test_condition,param_num)+str(log_name.group(1))+".log")
     ##scripting 跑 ltspice 模擬
