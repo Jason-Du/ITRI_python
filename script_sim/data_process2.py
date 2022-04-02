@@ -7,72 +7,48 @@ import seaborn as sns
 import pandas as pd
 import numpy as np
 from matplotlib.ticker import FormatStrFormatter
-DRAW_1=False
+from data_process3 import circuit_data_process,anlze_log_file
+DRAW_1=True
 DRAW_2=False
 MAX_VARIATION_ANALY=False
-CIRCUIT_ANALY=True
+CIRCUIT_ANALY=False
+CIRCUIT_Single=False#與# CIRCUIT_ANALY 是綁定一起的 Single 指的是頻率是single 的
+import time
 param_num=1
-device_name="rcj510n25"
+from collections import Counter
+# Device_list
+# rq3p300bh
+# rsj400n10
+# "rj1l12bgn"
 # "rd3l050sn"
-test_condition="10Vg_40Vds_5.5R"
+# "rcj510n25"
+# "rcj700N20"
 
-def anlze_log_file(meas_params=[],aging_coffs=[],logfile="",tol_range=[0,50]):
-    # range 的設計是 為了縮小繪圖的區間範圍 若 step 是 100 simulation 0.01 per step 則 [0,50] 可以模擬出 1~1.5 倍的模擬結果
-    # "./result/r8002cnd3_MOS_N_L.log"
-    # "monte_SiC.log"
-    # print("Number of steps  :", data.step_count)
-    data = LTSpiceLogReader(logfile)
-    step_names = data.get_step_vars()
-    meas_names = data.get_measure_names()
-    # print(step_names)# for step in step_names  print(step)# tol
-    # print(meas_names)#data[step][i])for step in step_names] data[name][i])for name in meas_names])
-    # print(data["tol1"])
-    #定義要觀察的量測指標
-    data_dict={}
-    step_dict = {}
-
-    ref = {}
-    for aging_coff in aging_coffs:
-        step_dict[aging_coff]=[float("%.2f"%x) for x in data[aging_coff][tol_range[0]:tol_range[1]]]#因為在spice 的模擬過程中 1 step 為 0.01 精度故調整為0.2f
-
-    step_size=len(step_dict[aging_coff])
-    step_dict_bool = np.array([True] *step_size)
-    for aging_coff in aging_coffs:
-        step_dict_bool= step_dict_bool & np.array([float(i)==0.0 for i in step_dict[aging_coff][tol_range[0]:tol_range[1]]])
-        # print(step_dict_bool)
-    ref_idx=np.where(step_dict_bool == True)
-
-    for meas_param in meas_params:
-        data_dict[meas_param]=data[meas_param][tol_range[0]:tol_range[1]]
-        ref[meas_param]=data_dict[meas_param][ref_idx[0][0]]
-    # duty ratio 需要特別處理 因為 spice 可能抓到 的是 duty on ratio 或是 1+duty_on ratio 查看 spice script 檔能有所理解
-    if "duty_ratio"  in meas_params:
-        data_dict["duty_ratio"]=[i if i<=1 else i-1 for i in data_dict["duty_ratio"] ]
-
-    var_dict = {}
-    var_max_dict = {}
-    var_max_idxs = {}
-    var_dict_percent={}
-    #以第一筆資料當作比較依據 後需資料除以 第一筆資料 查看其變化幅度 <1 為減少 >1 為增加
-    for meas_param in meas_params:
-        data_dict[meas_param]= [float(x/ref[meas_param]) for x in data_dict[meas_param]]
-        var_dict[meas_param]=[ x-1 for x in data_dict[meas_param]]    #資料全部減1 獲取變化的"幅度" <0 為減少 >0 為增加
-        var_dict_percent[meas_param] = [x*100 for x in var_dict[meas_param]]
-        var_max_dict[meas_param]=max(var_dict[meas_param],key=abs) #找出變化最大變化的"幅度"
-        var_max_idxs[meas_param]=var_dict[meas_param].index(var_max_dict[meas_param])#    # 把變化最大的資料 的index 儲存起來
-
-    # 把變化最大的資料 print 出來
-    # print(" rise time increase rate  : {} %".format( (  var_max_dict["tr1"]*100) )  )
-    # print(" fall time increase rate  : {} %".format( ( var_max_dict["tr2"]*100) )  )
-    # print(" maximum id current  increase rate : {} % ".format( ( var_max_dict["imax"]*100) )  )
-
-    return data_dict,step_dict,var_dict,var_dict_percent,var_max_idxs,var_max_dict
+# "rj1p12bbd"
+# "rq3p300bh"
+device_name="rj1p12bbd"#DRAW_1 MAX_VARIATION_ANALY CIRCUIT_ANALY 皆會用到
+device_condition="all_freq_7.5Vg_40Vds_70A" #全部都會用到
+circuit_condition="all_freq"  #CIRCUIT_ANALY 會用到
+# "all_freq"
+# "Rk_60kHz"
+#"40khz_7.5Vg_40Vds_1.6R"
+# all_freq_7.5Vg_40Vds_2.5R
+# "all_freq_7.5Vg_40Vds_70A"
+R_freq_dict={
+    #左邊為 頻率 右邊為電阻
+    200000:120000,
+    150000:155000,
+    100000:250000,
+    80000:300000,
+    60000:400000,
+    None:None
+}
 if __name__ == '__main__':
     if CIRCUIT_ANALY:
         # 在分析的過程中 若今天"rcj510n25" device 取 VTO 為影響 threshold voltage 的主要因素 下去模擬 25step 0.01 rate/step
         # switching loss 在 第7 次模擬結果後 升的超級高(第 10 step) 原因是因為站空比拉大 (90%) P_Sw 的 spice 的 script 裡面是 V*I 沒有足夠的時間下降 導製 ZVS ZCS 失去效用
         # switching loss (第 10 step) 之後開始劇降 原因是因為 output voltage 開始降低 拉不到 規格中的 42 V
-        #會發現系統後半段 的模擬 efficiency掉得很快 是因為 電壓已經拉不上去 拉不到 規格中的 42 V
+        # 會發現系統後半段 的模擬 efficiency掉得很快 是因為 電壓已經拉不上去 拉不到 規格中的 42 V
         # 原因是因為沒掉穩太狀態 所以能參考的資料 在模擬時間有限的狀況下(10ms) 僅能參考 7step 的資料資訊
         # set time (第 10 step) 之前 呈現 EXPONENTIAL GRAPH 式 的增長 driving 的能力變弱了 上升期 階段的流經電流慢慢隨著老化在下降
         # 上述原因導致了 需要比較長的時間來做 set up 進一步導致 diode 損壞 I peak avg break
@@ -81,75 +57,36 @@ if __name__ == '__main__':
         # 指標警示 可選擇 set up time 指標警示系統 可訂 530%
         # Switching 作為 指標警示系統 可訂 6.37%
         # efficiency 在前面9個step 變化不明顯 是因為 系統利用 條大佔空比 去彌補 trade -off switching loss 增加
-
-
-        meas_params = ["p_sw","voutpp","eff","t_set","duty_ratio","vout_avg"]
-        aging_coffs = ["tol1"]
-        title_ll = ["switching loss (%)", "ripple voltage (%)", "efficiency(%)","set up time (%)","switching on\nduty ratio (%)","output voltage(%)"]
-        tol_range1= [0,9]
-        data_dict, step_dict,var_dict,var_dict_percent,var_max_idxs,var_max_dict=anlze_log_file(meas_params=meas_params,
-                                                                                                aging_coffs=aging_coffs,
-                                                                                                logfile="./result/LTC1871-7_F09.log",
-                                                                                                tol_range=tol_range1)
-        # ########################將 step 的 param variation 轉為觀測用 的指標 VTO (%) -->threshold voltage (%)
-        meas_params2 = ["tr1", "tr2", "imax","vth"]
-        aging_coffs2 = ["tol1"]
-        param_sel = "vth"
-        tol_range2 =[0,50]
-        logfile2 = "./result/{}/{}/1/{}_MOS_N_VTO.log".format(device_name, test_condition, device_name)
-        data_dict2, step_dict2,var_dict2,var_dict_percent2,var_max_idxs2,var_max_dict2=anlze_log_file(meas_params=meas_params2,
-                                                                                                aging_coffs=aging_coffs2,
-                                                                                                logfile=logfile2,
-                                                                                                tol_range=tol_range2
-                                                                                                )
-        # ######################################
-
-        step_list = var_dict_percent2[param_sel][tol_range1[0]:tol_range1[1]]
-        y_low = min([x for k in var_dict_percent.values() for x in k]) - 5
-        y_high = max([x for k in var_dict_percent.values() for x in k]) + 5
-        fig, axes = plt.subplots(1, len(meas_params), figsize=(20, 10))
-        sns.set(context='notebook', style='whitegrid')
-        for idx, (indicator, title) in enumerate(zip(meas_params, title_ll)):
-            color = sns.color_palette("tab10")
-            y_low = min(var_dict_percent[indicator]) - 5
-            y_high = max(var_dict_percent[indicator]) + 5
-
-            axes[idx].plot(step_list, var_dict_percent[indicator], color=color[idx])
-            axes[idx].plot(step_list[var_max_idxs[indicator]], var_dict_percent[indicator][var_max_idxs[indicator]],
-                           marker="*", color="black", markersize=10)
-            axes[idx].text(step_list[var_max_idxs[indicator]], var_dict_percent[indicator][var_max_idxs[indicator]],
-                           "\n\n%.2f" % var_dict_percent[indicator][var_max_idxs[indicator]] + "%\n\n", fontsize=12,
-                           color="k", style="italic", weight="bold", verticalalignment='center',
-                           horizontalalignment='right', rotation=0)
-            axes[idx].yaxis.set_major_locator(MaxNLocator(5))
-            axes[idx].xaxis.set_major_locator(MaxNLocator(5))
-            axes[idx].set_xlabel("Vth" + " variation(%)", fontsize=15)
-            axes[idx].set_title(title, fontsize=20)
-            axes[idx].tick_params(axis='x', labelsize=15)
-            axes[idx].tick_params(axis='y', labelsize=15)
-            # axes[idx].set_ylim(min(data_dict["imax"]),max(data_dict["imax"]))
-            axes[idx].set_xlim(0.00, max(step_list))
-            axes[idx].yaxis.grid()
-            axes[idx].set_ylim(y_low, y_high)
-        plt.show()
-
+        # 容易被 user 量測的指標 : 電壓 有包含 ripple voltage set up time switching on duty ratio output voltage
+        freq_ll = [60000, 80000, 100000, 150000, 200000]
+        circuit_data_process(device_name=device_name,
+                             circuit_condition=circuit_condition,
+                             R_freq_dict=R_freq_dict,
+                             device_condition=device_condition,
+                             simulation_range=[0, 44],
+                             freq_sel_cir =freq_ll,#若為單頻率 選擇 [60000] 若無頻率選擇 [None]
+                             freq_sel_device =freq_ll,#若為單頻率 選擇 [60000] 若無頻率選擇 [None]
+                             )
+        # RQ3P300BH [20,38]
+        # RJ1P12BBD [0,44]
     if MAX_VARIATION_ANALY:
-        files = listdir("./result/{}/{}/{}".format(device_name,test_condition,param_num))
+        files = listdir("./result/{}/{}/{}".format(device_name,device_condition,param_num))
         meas_params = ["tr1","tr2","imax","vth"]
         aging_coffs = ["tol1"]
         var_max_idxs={}
         one_max_variation={}
         max_variations={"measure_value":[],"measure_name":[],"param_name":[]}
-        param_sel="vth"
+        param_sel="tr2"
 
         for f_idx, f in enumerate(files):
             pass
-            print(f)
-            logfile = "./result/{}/{}/{}/".format(device_name,test_condition,param_num)+f
-            data_dict, step_dict,var_dict,var_dict_percent,var_max_idxs,var_max_dict= anlze_log_file(meas_params=meas_params,
+            logfile = "./result/{}/{}/{}/".format(device_name,device_condition,param_num)+f
+            pd_data,data_dict, step_dict,var_dict,var_dict_percent,var_max_idxs,var_max_dict,ref_out= anlze_log_file(meas_params=meas_params,
                                                                                                      aging_coffs=aging_coffs,
                                                                                                      logfile=logfile,
-                                                                                                     tol_range=[0,50]
+                                                                                                     tol_range=[0,35],
+                                                                                                     freq_coff="freq",
+                                                                                                     freq_sel=60000
                                                                                                      )
             pattern = re.compile(r"%s_(.*).log"%device_name)
             mod_par=re.search(pattern,f)
@@ -192,8 +129,6 @@ if __name__ == '__main__':
         ax_s.yaxis.set_major_formatter(FormatStrFormatter('%.2f'))
         ax.set_title(param_sel+" v.s. Aging parameter", fontsize=20)
         plt.show()
-
-
     # 繪製曲線圖 橫縱軸都是以增加幅度繪製
     if DRAW_2:
         # "monte_SiC_rd31050sn.log"
@@ -205,10 +140,10 @@ if __name__ == '__main__':
         threshold_value=11# 以5來說 是5% 決定後續繪圖 +- 5 5 的範圍
         sel_param="imax"
         inject_param=["VTO","GAMMA  "]
-        data_dict, step_dict, var_dict, var_dict_percent, var_max_idxs, var_max_dict = anlze_log_file(meas_params=meas_params,
+        pd_data,data_dict, step_dict, var_dict, var_dict_percent, var_max_idxs, var_max_dict,ref_out= anlze_log_file(meas_params=meas_params,
                                                                                                       aging_coffs=aging_coffs,
                                                                                                       logfile=logfile,
-                                                                                                      tol_range=[0,100]
+                                                                                                      tol_range=[0,None]
                                                                                                       )
 
         palette_1=sns.color_palette("hls", 8)
@@ -245,85 +180,156 @@ if __name__ == '__main__':
         ax.set_xlabel("%s variation(rate)"%inject_param[1], fontsize=18)
         ax.set_title(" {} variation v.s. {} / {} Variation".format(title_ll[2],inject_param[0],inject_param[1]),fontsize=20)
         plt.show()
-
-
-
     if DRAW_1:
-        logfile = "./result/{}/{}/1/{}_MOS_N_VTO.log".format(device_name,test_condition,device_name)
+        logfile = "./result/{}/{}/1/{}_MOS_N_VTO.log".format(device_name,device_condition,device_name)
         pattern = re.compile(r"{}_(.*).log".format(device_name))
         mod_par = re.search(pattern,logfile)
         meas_params = ["tr1", "tr2", "imax","vth"]
         title_ll=["rise time (%)","fall time (%)","Ids (%)","Vth(%)"]
         aging_coffs = ["tol1"]
-
-        data_dict, step_dict,var_dict,var_dict_percent,var_max_idxs,var_max_dict=anlze_log_file(meas_params=meas_params,
-                                                                                                aging_coffs=aging_coffs,
-                                                                                                logfile=logfile,
-                                                                                                tol_range=[0,50])
-        step_list=[x+1for x in step_dict[aging_coffs[0]]]
-
-        y_low=min([x for k in var_dict_percent.values() for x in k ])-5
-        y_high=max([x for k in var_dict_percent.values() for x in k ])+5
-
-        fig,axes=plt.subplots(1,len(meas_params),figsize=(20, 10))
-        for idx,(indicator,title) in enumerate(zip(meas_params,title_ll)):
+        freq_ll=[60000,80000,100000,150000,200000]#若為單一頻率架購則設為None
+        # freq_ll=[200000]
+        if len(freq_ll)==1:
+            pd_data,data_dict, step_dict,var_dict,var_dict_percent,var_max_idxs,var_max_dict,ref_out=anlze_log_file(meas_params=meas_params,
+                                                                                                    aging_coffs=aging_coffs,
+                                                                                                    logfile=logfile,
+                                                                                                    tol_range=[0,None],
+                                                                                                    freq_coff="freq",
+                                                                                                    freq_sel=freq_ll[0]
+                                                                                                    )
+            step_list=[x+1for x in step_dict[aging_coffs[0]]]
+            #全部評比使用同一個座標軸
+            # y_low=min([x for k in var_dict_percent.values() for x in k ])-5
+            # y_high=max([x for k in var_dict_percent.values() for x in k ])+5
+            fig,axes=plt.subplots(1,len(meas_params),figsize=(20, 10))
+            # #繪製模擬時間內的最大電流 Rise time fall time
             color = sns.color_palette("Set1")
+            for idx,(indicator,title) in enumerate(zip(meas_params,title_ll)):
+                y_low=min(var_dict_percent[indicator])-5
+                y_high=max(var_dict_percent[indicator])+5
+                axes[idx].plot(step_list,var_dict_percent[indicator],color=color[idx] )
+                axes[idx].plot(step_list[var_max_idxs[indicator]],var_dict_percent[indicator][var_max_idxs[indicator]],marker="*",color="black",markersize=10)
+                axes[idx].text(step_list[var_max_idxs[indicator]], var_dict_percent[indicator][var_max_idxs[indicator]], "\n\n%.2f"%var_dict_percent[indicator][var_max_idxs[indicator]]+"%\n\n", fontsize=12, color="k", style="italic", weight="bold", verticalalignment='center',horizontalalignment='right', rotation=0)
+                axes[idx].yaxis.set_major_locator(MaxNLocator(5))
+                axes[idx].xaxis.set_major_locator(MaxNLocator(5))
+                axes[idx].set_xlabel(mod_par.group(1)+" variation(rate)",fontsize=15)
+                axes[idx].set_title(title,fontsize=20)
+                axes[idx].tick_params(axis='x', labelsize=15)
+                axes[idx].tick_params(axis='y', labelsize=15)
+                # axes[idx].set_ylim(min(data_dict["imax"]),max(data_dict["imax"]))
+                axes[idx].set_xlim(min(step_list),max(step_list))
+                axes[idx].yaxis.grid()
+                axes[idx].set_ylim(y_low,y_high)
+            plt.show()
+        else:
+            pd_data0, data_dict0, step_dict0, var_dict0, var_dict_percent0, var_max_idxs0, var_max_dict0, ref_out0= anlze_log_file(
+                meas_params=meas_params,
+                aging_coffs=aging_coffs,
+                logfile=logfile,
+                tol_range=[0, None],
+                freq_coff="freq",
+                freq_sel=min(freq_ll)# 在分析頻率中選擇 最大的頻率當作 referance
+                )
 
-            axes[idx].plot(step_list,var_dict_percent[indicator],color=color[idx] )
-            axes[idx].plot(step_list[var_max_idxs[indicator]],var_dict_percent[indicator][var_max_idxs[indicator]],marker="*",color="black",markersize=10)
-            axes[idx].text(step_list[var_max_idxs[indicator]], var_dict_percent[indicator][var_max_idxs[indicator]], "\n\n%.2f"%var_dict_percent[indicator][var_max_idxs[indicator]]+"%\n\n", fontsize=12, color="k", style="italic", weight="bold", verticalalignment='center',horizontalalignment='right', rotation=0)
-            axes[idx].yaxis.set_major_locator(MaxNLocator(5))
-            axes[idx].xaxis.set_major_locator(MaxNLocator(5))
-            axes[idx].set_xlabel(mod_par.group(1)+" variation(rate)",fontsize=15)
-            axes[idx].set_title(title,fontsize=20)
-            axes[idx].tick_params(axis='x', labelsize=15)
-            axes[idx].tick_params(axis='y', labelsize=15)
-            # axes[idx].set_ylim(min(data_dict["imax"]),max(data_dict["imax"]))
-            axes[idx].set_xlim(1.00,max(step_list))
-            axes[idx].yaxis.grid()
-            axes[idx].set_ylim(y_low,y_high)
+            data_collections = list(map( lambda x:anlze_log_file(
+                meas_params=meas_params,
+                aging_coffs=aging_coffs,
+                logfile=logfile,
+                tol_range=[0, None],
+                freq_coff="freq",
+                ref_dict=ref_out0,# 若要以上面的頻率當作全體頻率的referance 則 設為 ref_out0
+                freq_sel=x
+                ),freq_ll))
+            # print(len(data_collections[0]))
+            # print(len(list(zip(*data_collections))))
+            ##################Inject param (%) X 軸 Y 軸 為各個指標 #####################
+            # 從此圖發現 在 inject range 固定狀況下 頻率越高者帶來的變化幅度較小
+            # Vth 理解為 VGS 突破的電壓障礙 開始產生電流 高頻下的等效容值(Ciss)會下降 相對來說 vth 是下降的
+            # 但我們inject aging param 的 目的在於說 要讓threshold votage 偏移 觀察這個偏移的影響下 對系統以及對 Device Failure indicator 的影響
+            # 所以X軸 應改為 Vth 變化 來觀測
+            #高頻下 Ciss 阻抗小 升壓快(上升速度) 在量測相同的電流之下 他會量到比較高的電壓
+            fig, axes = plt.subplots(1, len(meas_params), figsize=(20, 10))
+            sns.set(context='notebook', style='whitegrid')
+            for freq_idx, data_collect in enumerate(data_collections):
+                pd_data, data_dict, step_dict, var_dict, var_dict_percent, var_max_idxs, var_max_dict,ref_out=data_collect
+                step_list = [x + 1 for x in step_dict[aging_coffs[0]]]
+                color = sns.color_palette("Set1")
+                for idx, (indicator, title) in enumerate(zip(meas_params, title_ll)):
+                    y_low = min(var_dict_percent[indicator]) - 5
+                    y_high = max(var_dict_percent[indicator]) + 5
+                    axes[idx].plot(step_list, var_dict_percent[indicator], color=color[freq_idx],label=str(freq_ll[freq_idx]/1E3)+"kHz")
+                    axes[idx].yaxis.set_major_locator(MaxNLocator(5))
+                    axes[idx].xaxis.set_major_locator(MaxNLocator(5))
+                    axes[idx].set_xlabel(mod_par.group(1) + " variation(rate)", fontsize=15)
+                    axes[idx].set_title(title, fontsize=20)
+                    axes[idx].tick_params(axis='x', labelsize=15)
+                    axes[idx].tick_params(axis='y', labelsize=15)
+                    # axes[idx].set_ylim(min(data_dict["imax"]),max(data_dict["imax"]))
+                    axes[idx].set_xlim(min(step_list), max(step_list))
+                    axes[idx].legend(loc="best",fontsize=10, title="Test Frequency", title_fontsize=10)
+                    axes[idx].yaxis.grid()
+                    # axes[idx].set_ylim(y_low, y_high)
+                    # handles, labels = axes[idx].get_legend_handles_labels()
+                    # fig.legend(handles, labels, loc='upper center',title="Test Frequency",title_fontsize=15,ncol=len(freq_ll))
+            # plt.show()
+            ##################Vth(%) X 軸 Y 軸 為 個個指標 ##############################
+            # 但因為 Vth 是我們觀測老化的一個重要指標 所以 我們將 Vth 轉為 X 軸
+            # 在相同的老化狀況下 高頻帶來對 Power MOSFET 的risetime falltime 影響 相對低頻來說影響較沒那麼大
+            # 原因是因為 高頻下的 店如阻抗較小 Gate drive 相對來說有比較強的能力去 drive 這柯mosfet  rise time fall performance 比較好
+            rm_param_sel="vth"#選擇作為x軸的 指標
+            fix_point = 45  # 固定要觀看的X值 在這裡為Vth 50% driftstep_list
+            step_list =[]
+            meas_params_rm = [x for x in meas_params if x != rm_param_sel]
+            fig3, axes3 = plt.subplots(1, len(meas_params_rm), figsize=(20, 10))
+            sns.set(context='notebook', style='whitegrid')
+            color = sns.color_palette("Set1")
+            for freq_idx, data_collect in enumerate(data_collections):
+                pd_data, data_dict, step_dict, var_dict, var_dict_percent, var_max_idxs, var_max_dict,ref_out=data_collect
+                # step_list = [x + 1 for x in step_dict[aging_coffs[0]]]
+                # if freq_idx==0:#認為 VTO 增幅固定 則Vth得出來的值 會相同 若認定 threshold votage 與 freq 有關 把if 這段去掉即可
+                step_list = var_dict_percent["vth"]
+                for idx, (indicator, title) in enumerate(zip(meas_params_rm, title_ll)):
+                    axes3[idx].plot(step_list, var_dict_percent[indicator], color=color[freq_idx],label=str(freq_ll[freq_idx]/1E3)+"kHz")
+                    axes3[idx].axvline(x=fix_point, color='k', linestyle='--')
+                    axes3[idx].yaxis.set_major_locator(MaxNLocator(5))
+                    axes3[idx].xaxis.set_major_locator(MaxNLocator(5))
+                    axes3[idx].set_xlabel("Threshold Voltage variation(%)", fontsize=15)
+                    axes3[idx].set_title(title, fontsize=20)
+                    axes3[idx].tick_params(axis='x', labelsize=15)
+                    axes3[idx].tick_params(axis='y', labelsize=15)
+                    axes3[idx].set_xticks(list(axes3[idx].get_xticks()) + [fix_point])
+                    # axes[idx].set_ylim(min(data_dict["imax"]),max(data_dict["imax"]))
+                    # axes[idx].set_xlim(0, max(step_list))
+                    # axes[idx].legend(fontsize=10, title="Test Frequency", title_fontsize=15)
+                    axes3[idx].legend(loc='best',fontsize=10,title="Test Frequency",title_fontsize=10)
+                    axes3[idx].xaxis.grid()
+                    # axes[idx].set_ylim(y_low, y_high)
+                    # handles, labels = axes3[freq_idx].get_legend_handles_labels()
+                    # fig3.legend(handles, labels, loc='upper center',title="Test Frequency",title_fontsize=15,ncol=len(freq_ll))
 
-        # #繪製模擬時間內的最大電流
-        # color = sns.color_palette("Set1")
-        # # sns.set()
-        # axes[0].plot(step_list,var_dict_percent["imax"],color=color[0] )
-        # axes[0].plot(step_list[var_max_idxs["imax"]],var_dict_percent["imax"][var_max_idxs["imax"]],marker="*",color="black",markersize=10)
-        # axes[0].text(step_list[var_max_idxs["imax"]], var_dict_percent["imax"][var_max_idxs["imax"]], "%.3f"%var_dict_percent["imax"][var_max_idxs["imax"]]+" %\n\n", fontsize=12, color="k", style="italic", weight="bold", verticalalignment='center',horizontalalignment='right', rotation=0)
-        # axes[0].yaxis.set_major_locator(MaxNLocator(5))
-        # axes[0].xaxis.set_major_locator(MaxNLocator(5))
-        # axes[0].set_xlabel(mod_par.group(1)+" variation(rate)",fontsize=15)
-        # axes[0].set_title("Drain current (%)",fontsize=20)
-        # axes[0].tick_params(axis='x', labelsize=15)
-        # axes[0].tick_params(axis='y', labelsize=15)
-        # # axes[0].set_ylim(min(data_dict["imax"]),max(data_dict["imax"]))
-        # axes[0].set_xlim(1.00,2.00)
-        # axes[0].yaxis.grid()
-        # axes[0].set_ylim(y_low,y_high)
-        # #繪製模擬時間內的rise time
-        # axes[1].plot(step_list,var_dict_percent["tr1"],color=color[1])
-        # axes[1].plot(step_list[var_max_idxs["tr1"]],var_dict_percent["tr1"][var_max_idxs["tr1"]],marker="*",color="black",markersize=10)
-        # axes[1].text(step_list[var_max_idxs["tr1"]], var_dict_percent["tr1"][var_max_idxs["tr1"]],"%.3f" % var_dict_percent["tr1"][var_max_idxs["tr1"]] + " %\n\n", fontsize=12, color="k",style="italic", weight="bold", verticalalignment='center', horizontalalignment='right', rotation=0)
-        # axes[1].yaxis.set_major_locator(MaxNLocator(5))
-        # axes[1].xaxis.set_major_locator(MaxNLocator(5))
-        # axes[1].set_xlabel(mod_par.group(1)+" variation(rate)",fontsize=15)
-        # axes[1].set_title("rise time (%) ",fontsize=20)
-        # axes[1].tick_params(axis='x', labelsize=15)
-        # axes[1].tick_params(axis='y', labelsize=15)
-        # # axes[1].set_ylim(min(data_dict["tr1"]),max(data_dict["tr1"]))
-        # axes[1].yaxis.grid()
-        # axes[1].set_ylim(y_low,y_high)
-        # #繪製模擬時間內的fall time
-        # axes[2].plot(step_list,var_dict_percent["tr2"],color=color[2] )
-        # axes[2].plot(step_list[var_max_idxs["tr2"]],var_dict_percent["tr2"][var_max_idxs["tr2"]],marker="*",color="black",markersize=10)
-        # axes[2].text(step_list[var_max_idxs["tr2"]], var_dict_percent["tr2"][var_max_idxs["tr2"]],"%.3f" % var_dict_percent["tr2"][var_max_idxs["tr2"]] + " %\n\n", fontsize=12, color="k",style="italic", weight="bold", verticalalignment='center', horizontalalignment='right', rotation=0)
-        # axes[2].yaxis.set_major_locator(MaxNLocator(5))
-        # axes[2].xaxis.set_major_locator(MaxNLocator(5))
-        # axes[2].set_xlabel(mod_par.group(1)+" variation(rate)",fontsize=15)
-        # axes[2].set_title("fall time (%)",fontsize=20)
-        # axes[2].tick_params(axis='x', labelsize=15)
-        # axes[2].tick_params(axis='y', labelsize=15)
-        # # axes[2].set_ylim(min(data_dict["tr2"]),max(data_dict["tr2"]))
-        # axes[2].yaxis.grid()
-        # axes[2].set_ylim(y_low,y_high)
+            #################Frequency X 軸 Y 軸 取變化量最大者##########################
+            #  將Vth 作為X軸 固定可以發現 頻率越高者 帶來的變化越大
+            # 頻率越高者在相同老化情形下對系統的影響可能較大
+            fix_indicator_y= {x:[] for x in meas_params}
+            for freq_idx, data_collect in enumerate(data_collections):
+                pd_data, data_dict, step_dict, var_dict, var_dict_percent, var_max_idxs, var_max_dict,ref_out= data_collect
+                # if freq_idx == 0:#認為 VTO 增幅固定 則Vth得出來的值 會相同 若認定 threshold votage 與 freq 有關 把if 這段去掉即可
+                step_list = var_dict_percent["vth"]
+                for indicator in meas_params_rm:
+                    fix_indicator_y[indicator].append(np.interp(fix_point,step_list,var_dict_percent[indicator]))
+            fig2, axes2 = plt.subplots(1, len(meas_params_rm), figsize=(20, 10))
+            color = sns.color_palette("Set1")
+            freq_ll_k = [int(x / 1E3) for x in freq_ll]
+            for idx, (indicator, title) in enumerate(zip(meas_params_rm, title_ll)):
+                var_percnt_ll = fix_indicator_y[indicator]
+                var_percnt_ll = [round((x / var_percnt_ll[-1] - 1) * 100, 2) for x in var_percnt_ll]# 選擇哪一個頻率當作referance -1 為 freqll 最後一個頻率 0 為第一個
+                axes2[idx].plot(freq_ll_k, var_percnt_ll, color=color[idx])
+                axes2[idx].yaxis.set_major_locator(MaxNLocator(5))
+                axes2[idx].set_xticks([x for x in range (min(freq_ll_k),max(freq_ll_k)+20,20)])
+                axes2[idx].set_xlabel("Frequency (kHz)", fontsize=15)
+                axes2[idx].set_title(title, fontsize=20)
+                axes2[idx].tick_params(axis='x', labelsize=15)
+                axes2[idx].tick_params(axis='y', labelsize=15)
 
-        plt.show()
+                axes2[idx].xaxis.grid()
+            plt.show()

@@ -5,7 +5,7 @@ from matplotlib.ticker import AutoLocator
 import matplotlib.ticker as tick
 from matplotlib.ticker import FormatStrFormatter
 import re
-log_data  = open("../script_sim/result/1/r8002cnd3_MOS_N_L.log", 'r')
+log_data  = open("../script_sim/result/rsj400n10/all_freq_7.5Vg_40Vds_70A/1/rsj400n10_DDG_CJO.log", 'r')
 step_num=100 #step=n 實際模擬次數為n+1 注意!!!!!!!!!!!!!!!!!!!!!
 step_list = []
 measure_name_list=[]

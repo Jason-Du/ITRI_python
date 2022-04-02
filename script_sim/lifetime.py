@@ -74,7 +74,6 @@ def Weibull_plot(shape=shape,scale=scale):
     #     y_value=sh_s* np.log(x[0,1:])-(np.log(sc_s)*sh_s)
     #     axes[3].plot((np.log(np.squeeze(x)[1:])), np.squeeze(y_value), lw=2,label='paper regression No%d' % idx, color=color[idx])
     ##################################
-
     plt.show()
 
 # ################ 計算 frequency 對於 lifetime 方面的評估
@@ -96,3 +95,4 @@ ag_th=0.8
 ag_ll=[]
 x = weibull_min.rvs(shape[0],scale=scale[0],loc=0,size=sim_num)
 print(x)
+Weibull_plot(shape=shape,scale=scale)

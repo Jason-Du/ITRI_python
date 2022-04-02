@@ -24,12 +24,22 @@ from os import listdir
 from os.path import isfile, isdir, join
 CLEAR_LIB_FILE=False
 CLEAR_RESULT_FILE=False
-SCRIPTING_SIM=True
-param_num=1# LTSPICE 電路檔記得要調整
-device_name="rcj510n25"
-test_condition="10Vg_40Vds_5.5R"
+SCRIPTING_SIM=False
+param_num=1# LTSPICE 電路檔記得要調整 並按下LTSPICE 儲存建
+device_name="rj1p12bbd"
+test_condition="all_freq_7Vg_40Vds_77A"# test_condition 也要調整
+# rsj301n10
+# rsj400n10
+# rsj550n10
+# rsj400n10
+# "rj1p12bbd"
+# rq3p300bh
+
 # "rcj510n25"
 # "rd3l050sn"
+# "rj1l12bgn"
+# "rcj700N20"
+# rsj301n10
 def spice_data_anlyz(input_lib=""):
     spice_txt = open(input_lib,'r') #放置lib 檔的地方
     pars=[] # 參數集合 小單元為 par_dict[{'par_name':///, 'par_val':///, 'idx':///}] #於for 迴圈中使用
@@ -50,8 +60,8 @@ def spice_data_anlyz(input_lib=""):
         pattern4=re.compile(r".ENDS")
         end_bool=re.search(pattern4,line)
 
-
         if model_name is not None :
+
             model_names.append(model_name.group(1))
 
         if (model_name is not None or end_bool is not None):
@@ -60,7 +70,7 @@ def spice_data_anlyz(input_lib=""):
             flag=flag+1
             pars = []
 
-        if par is not None and last_par is None and par.group(1)!="LEVEL": # last_par is None 條件是將 {//////*(1+tol)} 給予 if last_par is not None: # 程式碼去處理 應蓋也要納入 model 作為條件
+        if par is not None and last_par is None and par.group(1)!="LEVEL" and par.group(1)!="TNOM":# 撇除要模擬的參數  # last_par is None 條件是將 {//////*(1+tol)} 給予 if last_par is not None: # 程式碼去處理 應蓋也要納入 model 作為條件
             # 有甚麼參數是不需要納入考量的也可以寫在這裡 如 LEVEL
             par_dict["par_name"]=par.group(1)
             par_dict["par_val"] = par.group(2)
@@ -153,6 +163,7 @@ if __name__ == '__main__':
     if CLEAR_LIB_FILE:
         input_lib = r"C:\Users\user\Documents\LTspiceXVII\file\LIB\%s_copy.lib"%device_name
         last_pars, mod_par_dict=spice_data_anlyz(input_lib=input_lib)
+
 
         now_par_idxs_ll=[]
         now_par_ll     =[]
