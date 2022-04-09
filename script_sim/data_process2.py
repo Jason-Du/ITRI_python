@@ -8,11 +8,10 @@ import pandas as pd
 import numpy as np
 from matplotlib.ticker import FormatStrFormatter
 from data_process3 import circuit_data_process,anlze_log_file
-DRAW_1=True
+DRAW_1=False
 DRAW_2=False
 MAX_VARIATION_ANALY=False
-CIRCUIT_ANALY=False
-CIRCUIT_Single=False#與# CIRCUIT_ANALY 是綁定一起的 Single 指的是頻率是single 的
+CIRCUIT_ANALY=True
 import time
 param_num=1
 from collections import Counter
@@ -63,12 +62,12 @@ if __name__ == '__main__':
                              circuit_condition=circuit_condition,
                              R_freq_dict=R_freq_dict,
                              device_condition=device_condition,
-                             simulation_range=[0, 44],
+                             simulation_range=[0,44],
                              freq_sel_cir =freq_ll,#若為單頻率 選擇 [60000] 若無頻率選擇 [None]
                              freq_sel_device =freq_ll,#若為單頻率 選擇 [60000] 若無頻率選擇 [None]
                              )
         # RQ3P300BH [20,38]
-        # RJ1P12BBD [0,44]
+        # RJ1P12BBD [0,45]
     if MAX_VARIATION_ANALY:
         files = listdir("./result/{}/{}/{}".format(device_name,device_condition,param_num))
         meas_params = ["tr1","tr2","imax","vth"]
@@ -76,22 +75,24 @@ if __name__ == '__main__':
         var_max_idxs={}
         one_max_variation={}
         max_variations={"measure_value":[],"measure_name":[],"param_name":[]}
-        param_sel="tr2"
-
+        param_sel="tr1"
+        aging_param_ll=['MOS_N_RS','MOS_N_RD','MOS_N_RG','MOS_N_RS','MOS_N_TOX','MOS_N_VTO',
+                        'MOS_N_ETA','MOS_N_CGSO','MOS_N_CGDO','MOS_N_CDSO','MOS_N_GAMMA',
+                        'MOS_N_NFS','MOS_N_UO','MOS_N_VMAX','MOS_N_CGBO']
         for f_idx, f in enumerate(files):
             pass
             logfile = "./result/{}/{}/{}/".format(device_name,device_condition,param_num)+f
             pd_data,data_dict, step_dict,var_dict,var_dict_percent,var_max_idxs,var_max_dict,ref_out= anlze_log_file(meas_params=meas_params,
                                                                                                      aging_coffs=aging_coffs,
                                                                                                      logfile=logfile,
-                                                                                                     tol_range=[0,35],
+                                                                                                     tol_range=[0,None],
                                                                                                      freq_coff="freq",
-                                                                                                     freq_sel=60000
+                                                                                                     freq_sel=200000
                                                                                                      )
             pattern = re.compile(r"%s_(.*).log"%device_name)
             mod_par=re.search(pattern,f)
             # if [var_max_dict[meas_param]for meas_param in meas_params]!=[0,0,0]:#納入繪圖條件設置[0,0,0]代表三個量測值皆無變化不與討論
-            if var_max_dict[param_sel]!=0 and mod_par.group(1) not in ["MOS_N_L","MOS_N_W"]:#濾出 imax 不等於0的資訊 撇除不要考慮的 parameter
+            if var_max_dict[param_sel]!=0 and mod_par.group(1) in aging_param_ll:# not in ["MOS_N_L","MOS_N_W"]濾出 imax 不等於0的資訊 撇除不要考慮的 parameter
                 max_variations["measure_value"]=max_variations["measure_value"]+[var_max_dict[meas_param]*100 for meas_param in meas_params]
                 max_variations["measure_name"]=max_variations["measure_name"]+[meas_param for meas_param in meas_params]
                 max_variations["param_name"]=max_variations["param_name"]+[mod_par.group(1)for meas_param in meas_params]
@@ -202,6 +203,7 @@ if __name__ == '__main__':
             # y_low=min([x for k in var_dict_percent.values() for x in k ])-5
             # y_high=max([x for k in var_dict_percent.values() for x in k ])+5
             fig,axes=plt.subplots(1,len(meas_params),figsize=(20, 10))
+            sns.set(context='notebook', style='whitegrid')
             # #繪製模擬時間內的最大電流 Rise time fall time
             color = sns.color_palette("Set1")
             for idx,(indicator,title) in enumerate(zip(meas_params,title_ll)):
@@ -230,7 +232,6 @@ if __name__ == '__main__':
                 freq_coff="freq",
                 freq_sel=min(freq_ll)# 在分析頻率中選擇 最大的頻率當作 referance
                 )
-
             data_collections = list(map( lambda x:anlze_log_file(
                 meas_params=meas_params,
                 aging_coffs=aging_coffs,
@@ -238,8 +239,10 @@ if __name__ == '__main__':
                 tol_range=[0, None],
                 freq_coff="freq",
                 ref_dict=ref_out0,# 若要以上面的頻率當作全體頻率的referance 則 設為 ref_out0
+                # 目前Vth 設定不會吃這個 referance 設定 要做更改的話往 analyze log function 做修改 約略31行
                 freq_sel=x
                 ),freq_ll))
+
             # print(len(data_collections[0]))
             # print(len(list(zip(*data_collections))))
             ##################Inject param (%) X 軸 Y 軸 為各個指標 #####################
@@ -247,7 +250,8 @@ if __name__ == '__main__':
             # Vth 理解為 VGS 突破的電壓障礙 開始產生電流 高頻下的等效容值(Ciss)會下降 相對來說 vth 是下降的
             # 但我們inject aging param 的 目的在於說 要讓threshold votage 偏移 觀察這個偏移的影響下 對系統以及對 Device Failure indicator 的影響
             # 所以X軸 應改為 Vth 變化 來觀測
-            #高頻下 Ciss 阻抗小 升壓快(上升速度) 在量測相同的電流之下 他會量到比較高的電壓
+            # 解釋一 : 高頻下 Ciss 阻抗小 升壓快(上升速度) 在量測相同的電流之下 他會量到比較高的電壓
+            # 解釋二 : 將device 在inject param=0 定為 brand new 狀態 以此來去抹除 freq 帶來 量測Vth 的誤差 高頻下 Ciss 阻抗小 需要較小的電壓就可以驅動 mosfet
             fig, axes = plt.subplots(1, len(meas_params), figsize=(20, 10))
             sns.set(context='notebook', style='whitegrid')
             for freq_idx, data_collect in enumerate(data_collections):
@@ -266,7 +270,7 @@ if __name__ == '__main__':
                     axes[idx].tick_params(axis='y', labelsize=15)
                     # axes[idx].set_ylim(min(data_dict["imax"]),max(data_dict["imax"]))
                     axes[idx].set_xlim(min(step_list), max(step_list))
-                    axes[idx].legend(loc="best",fontsize=10, title="Test Frequency", title_fontsize=10)
+                    axes[idx].legend(loc="best",fontsize=15, title="Test Frequency", title_fontsize=15)
                     axes[idx].yaxis.grid()
                     # axes[idx].set_ylim(y_low, y_high)
                     # handles, labels = axes[idx].get_legend_handles_labels()
@@ -274,10 +278,14 @@ if __name__ == '__main__':
             # plt.show()
             ##################Vth(%) X 軸 Y 軸 為 個個指標 ##############################
             # 但因為 Vth 是我們觀測老化的一個重要指標 所以 我們將 Vth 轉為 X 軸
-            # 在相同的老化狀況下 高頻帶來對 Power MOSFET 的risetime falltime 影響 相對低頻來說影響較沒那麼大
+            # 解釋一 : 在相同的老化狀況下 高頻帶來對 Power MOSFET 的risetime falltime 影響 相對低頻來說影響較沒那麼大
             # 原因是因為 高頻下的 店如阻抗較小 Gate drive 相對來說有比較強的能力去 drive 這柯mosfet  rise time fall performance 比較好
+            # 但降頻有助於老化速度縮減 是需要去取捨的地方
+            # 解釋二 : 在相同的老化狀況下 高頻帶來對 Power MOSFET 的risetime falltime 影響 相對低頻來說影響比較大 較為 Sensitive
+            # 降頻有助於 減緩老化帶來的影響 可以預期對於系統層面 低頻影響會比較小
+            # rise time 相對於 fall time 來說影響較為巨大
             rm_param_sel="vth"#選擇作為x軸的 指標
-            fix_point = 45  # 固定要觀看的X值 在這裡為Vth 50% driftstep_list
+            fix_points =[10,20,30,40,45]  # 固定要觀看的X值 在這裡為Vth 50% driftstep_list
             step_list =[]
             meas_params_rm = [x for x in meas_params if x != rm_param_sel]
             fig3, axes3 = plt.subplots(1, len(meas_params_rm), figsize=(20, 10))
@@ -290,46 +298,54 @@ if __name__ == '__main__':
                 step_list = var_dict_percent["vth"]
                 for idx, (indicator, title) in enumerate(zip(meas_params_rm, title_ll)):
                     axes3[idx].plot(step_list, var_dict_percent[indicator], color=color[freq_idx],label=str(freq_ll[freq_idx]/1E3)+"kHz")
-                    axes3[idx].axvline(x=fix_point, color='k', linestyle='--')
+                    for fix_point in fix_points:
+                        axes3[idx].axvline(x=fix_point,color='0.5', linestyle='--')# 繪製X座標標記線畫出 觀測點
                     axes3[idx].yaxis.set_major_locator(MaxNLocator(5))
                     axes3[idx].xaxis.set_major_locator(MaxNLocator(5))
                     axes3[idx].set_xlabel("Threshold Voltage variation(%)", fontsize=15)
                     axes3[idx].set_title(title, fontsize=20)
                     axes3[idx].tick_params(axis='x', labelsize=15)
                     axes3[idx].tick_params(axis='y', labelsize=15)
-                    axes3[idx].set_xticks(list(axes3[idx].get_xticks()) + [fix_point])
+                    axes3[idx].xaxis.set_major_locator(MaxNLocator(5))
+                    axes3[idx].xaxis.set_major_locator(MaxNLocator(5))
+                    axes3[idx].set_xticks(list(axes3[idx].get_xticks()) + fix_points)
                     # axes[idx].set_ylim(min(data_dict["imax"]),max(data_dict["imax"]))
                     # axes[idx].set_xlim(0, max(step_list))
                     # axes[idx].legend(fontsize=10, title="Test Frequency", title_fontsize=15)
-                    axes3[idx].legend(loc='best',fontsize=10,title="Test Frequency",title_fontsize=10)
+                    axes3[idx].legend(loc='best',fontsize=15,title="Test Frequency",title_fontsize=15)
                     axes3[idx].xaxis.grid()
                     # axes[idx].set_ylim(y_low, y_high)
                     # handles, labels = axes3[freq_idx].get_legend_handles_labels()
                     # fig3.legend(handles, labels, loc='upper center',title="Test Frequency",title_fontsize=15,ncol=len(freq_ll))
 
             #################Frequency X 軸 Y 軸 取變化量最大者##########################
-            #  將Vth 作為X軸 固定可以發現 頻率越高者 帶來的變化越大
-            # 頻率越高者在相同老化情形下對系統的影響可能較大
-            fix_indicator_y= {x:[] for x in meas_params}
-            for freq_idx, data_collect in enumerate(data_collections):
-                pd_data, data_dict, step_dict, var_dict, var_dict_percent, var_max_idxs, var_max_dict,ref_out= data_collect
-                # if freq_idx == 0:#認為 VTO 增幅固定 則Vth得出來的值 會相同 若認定 threshold votage 與 freq 有關 把if 這段去掉即可
-                step_list = var_dict_percent["vth"]
-                for indicator in meas_params_rm:
-                    fix_indicator_y[indicator].append(np.interp(fix_point,step_list,var_dict_percent[indicator]))
+            #  固定Fix point 去觀測 各個頻率之間varition 的差異
+            # 在Aging 沒那麼嚴重的情形下 (10% ) 越低頻反而對於 老化帶來的影響比較 sensitive
+            # 在Aging 比較嚴重的情形下   (45% ) 越高頻反而對於 老化帶來的影響比較 sensitive 不論是正影響或是負影響
             fig2, axes2 = plt.subplots(1, len(meas_params_rm), figsize=(20, 10))
-            color = sns.color_palette("Set1")
-            freq_ll_k = [int(x / 1E3) for x in freq_ll]
-            for idx, (indicator, title) in enumerate(zip(meas_params_rm, title_ll)):
-                var_percnt_ll = fix_indicator_y[indicator]
-                var_percnt_ll = [round((x / var_percnt_ll[-1] - 1) * 100, 2) for x in var_percnt_ll]# 選擇哪一個頻率當作referance -1 為 freqll 最後一個頻率 0 為第一個
-                axes2[idx].plot(freq_ll_k, var_percnt_ll, color=color[idx])
-                axes2[idx].yaxis.set_major_locator(MaxNLocator(5))
-                axes2[idx].set_xticks([x for x in range (min(freq_ll_k),max(freq_ll_k)+20,20)])
-                axes2[idx].set_xlabel("Frequency (kHz)", fontsize=15)
-                axes2[idx].set_title(title, fontsize=20)
-                axes2[idx].tick_params(axis='x', labelsize=15)
-                axes2[idx].tick_params(axis='y', labelsize=15)
-
-                axes2[idx].xaxis.grid()
+            sns.set(context='notebook', style='whitegrid')
+            for fix_idx,fix_point in enumerate(fix_points):
+                #依序對 Vth fix point 進行線性插值
+                fix_indicator_y= {x:[] for x in meas_params}
+                for freq_idx, data_collect in enumerate(data_collections):
+                    pd_data, data_dict, step_dict, var_dict, var_dict_percent, var_max_idxs, var_max_dict,ref_out= data_collect
+                    # if freq_idx == 0:#認為 VTO 增幅固定 則Vth得出來的值 會相同 若認定 threshold votage 與 freq 有關 把if 這段去掉即可
+                    step_list = var_dict_percent["vth"]
+                    for indicator in meas_params_rm:#依序存取 failure indicator 結果
+                        fix_indicator_y[indicator].append(np.interp(fix_point,step_list,var_dict_percent[indicator])) #線性插值法取出對應的value值
+                color = sns.color_palette("tab10")
+                freq_ll_k = [int(x / 1E3) for x in freq_ll]
+                for idx, (indicator, title) in enumerate(zip(meas_params_rm, title_ll)):
+                    var_percnt_ll = fix_indicator_y[indicator]
+                    var_percnt_ll = var_percnt_ll - var_percnt_ll[0]
+                    # var_percnt_ll = [round((x / var_percnt_ll[0] - 1) * 100, 2) for x in var_percnt_ll]# 選擇哪一個頻率當作referance -1 為 freqll 最後一個頻率 0 為第一個
+                    axes2[idx].plot(freq_ll_k, var_percnt_ll, color=color[fix_idx],label="%d %%"%fix_point)
+                    axes2[idx].yaxis.set_major_locator(MaxNLocator(5))
+                    axes2[idx].set_xticks([x for x in range (min(freq_ll_k),max(freq_ll_k)+20,20)])
+                    axes2[idx].set_xlabel("Frequency (kHz)", fontsize=15)
+                    axes2[idx].set_title(title, fontsize=20)
+                    axes2[idx].tick_params(axis='x', labelsize=15)
+                    axes2[idx].tick_params(axis='y', labelsize=15)
+                    axes2[idx].yaxis.grid()
+                    axes2[idx].legend(loc='best', fontsize=15, title="Vth Aging Point ", title_fontsize=15)
             plt.show()

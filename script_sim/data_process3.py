@@ -3,6 +3,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 from operator import itemgetter
+from matplotlib.ticker import FormatStrFormatter
 import numpy as np
 def anlze_log_file(meas_params=[],aging_coffs=[],freq_coff=None,logfile="",tol_range=[0,None],freq_sel=None,ref_dict=None):
     # range 的設計是 為了縮小繪圖的區間範圍 若 step 是 100 simulation 0.01 per step 則 [0,50] 可以模擬出 1~1.5 倍的模擬結果 預設是全部print 出
@@ -28,7 +29,10 @@ def anlze_log_file(meas_params=[],aging_coffs=[],freq_coff=None,logfile="",tol_r
     for meas_param in meas_params:
         if freq_sel is not None:
             data_dict[meas_param] = list(itemgetter(*freq_idxs)(data[meas_param]))[0:tol_range[1]]
-            if ref_dict is not None:
+            if ref_dict is not None and meas_param!="vth": # Vth 的 比較方式 不同於 indicator 是以inject =0 當作是最基礎狀態 屏除 freq 帶來的量測誤差
+                #1. meas_param 設置為 None 的話 若ref_dict 設置為 None 則200 khz 會以 200khz inject =0 為基準 60khz 會以 60 khz inject =0 為基準
+                #2. meas_param設置為 None 的話 若ref_dict 設置為 200 單頻得到的結果 則200 khz 會以 200khz inject =0 為基準 60khz 會以 200 khz inject =0 為基準
+                #meas_param設置為 vth 的話 若ref_dict 設置為 200 單頻得到的結果  則200 khz 會以 200khz inject =0 為基準 60khz 會以 200 khz  inject =0 為基準 vth 則會走第一個選項
                 ref[meas_param]=ref_dict[meas_param]
             else:
                 ref[meas_param]=data_dict[meas_param][ref_idx]
@@ -45,9 +49,16 @@ def anlze_log_file(meas_params=[],aging_coffs=[],freq_coff=None,logfile="",tol_r
     var_dict_percent={}
     #以第一筆資料當作比較依據 後需資料除以 第一筆資料 查看其變化幅度 <1 為減少 >1 為增加
     for meas_param in meas_params:
-        data_dict[meas_param]= [float(x/ref[meas_param]) for x in data_dict[meas_param]][tol_range[0]:]
-        var_dict[meas_param]=[ x-1 for x in data_dict[meas_param]] #資料全部減1 獲取變化的"幅度" <0 為減少 >0 為增加
-        var_dict_percent[meas_param] = [x*100 for x in var_dict[meas_param]]
+        # if meas_param=="duty_ratio":#因為efficenicy 是本身就是用percentage 表示 所以採用鄉檢的方式去呈現下降的比例是多少
+        #     data_dict[meas_param] = [float("%.4f" % (x)) for x in data_dict[meas_param]][tol_range[0]:]
+        #
+        #     var_dict_percent[meas_param]=[(x-ref[meas_param])*100for x in data_dict[meas_param]]
+        #     var_dict[meas_param]=var_dict_percent[meas_param]
+        # else :
+        data_dict[meas_param] = [float("%.4f" % (x / ref[meas_param])) for x in data_dict[meas_param]][tol_range[0]:]  # 數舉處理後為比例 .4f 代表取到 百分位後第二位
+        var_dict[meas_param] = [x - 1 for x in data_dict[meas_param]]  # 資料全部減1 獲取變化的"幅度" <0 為減少 >0 為增加
+        var_dict_percent[meas_param] = [x * 100 for x in var_dict[meas_param]]
+
         var_max_dict[meas_param]=max(var_dict[meas_param],key=abs) #找出變化最大變化的"幅度"
         var_max_idxs[meas_param]=var_dict[meas_param].index(var_max_dict[meas_param])#    # 把變化最大的資料 的index 儲存起來
 
@@ -69,12 +80,16 @@ def circuit_data_process(device_name,
     meas_params = ["p_sw", "voutpp", "eff", "t_set", "duty_ratio", "vout_avg","i_drive"]
     aging_coffs = ["tol1"]
     title_ll = ["switching loss (%)", "ripple voltage (%)", "efficiency(%)", "set up time (%)",
-                "switching on\nduty ratio (%)", "output voltage(%)", "Ids drive(%)" ]
+                "switching on\nduty ratio (%)", "output voltage(%)", "Ids(%)" ]
     tol_range1 = simulation_range
     logfile1 = "./result/LTC1871/{}/{}/LTC1871-7_F09.log".format(device_name, circuit_condition)  # 轉為觀測用 的指標
     #### INITIAL 初始設定###############
     ###########################
     if len(freq_sel_cir)==1:
+        # 今天若是做單頻率的測試 則 橫坐標的 Vth 以該頻率量測到的值去做比例分析
+        # rj1p12bbd" 這顆device range 20000 範圍設置 [0 44] 之下 可以看到此系統崩潰前的一些前兆 set up time,ripple voltage(易量測) , switching loss , Ids eff,dutyratio
+        # efficenicy 雖然在[0 44] 之下 稍微下降肇因為 switching loss ripple voltage 稍微 上升
+        #
         pd_data, data_dict, step_dict, var_dict, var_dict_percent, var_max_idxs, var_max_dict,ref_out= anlze_log_file(
             meas_params=meas_params,
             aging_coffs=aging_coffs,
@@ -133,6 +148,7 @@ def circuit_data_process(device_name,
         plt.show()
     else:
         pass
+        #
 
         pd_data10, data_dict10, step_dict10, var_dict10, var_dict_percent10, var_max_idxs10, var_max_dict10, ref_out10 = anlze_log_file(
             meas_params=meas_params,
@@ -148,7 +164,7 @@ def circuit_data_process(device_name,
             logfile=logfile1,tol_range=tol_range1,
             freq_coff="r_freq",
             freq_sel=R_freq_dict[x],
-            ref_dict=ref_out10
+            ref_dict=ref_out10#174行需要去做調整 或不做調整 174 設None 代表 認定 inject param =0 為 brand new
             ),freq_sel_cir))
 #         pd_data, data_dict, step_dict, var_dict, var_dict_percent, var_max_idxs, var_max_dict
         meas_params2 = ["tr1", "tr2", "imax", "vth"]
@@ -163,7 +179,7 @@ def circuit_data_process(device_name,
             logfile=logfile2,
             tol_range=tol_range2,
             freq_coff="freq",
-            freq_sel=min(freq_sel_device)
+            freq_sel=max(freq_sel_device)
         )
         data_collections_dev = list(map(lambda x:anlze_log_file(
             meas_params=meas_params2,
@@ -171,15 +187,30 @@ def circuit_data_process(device_name,
             logfile=logfile2,
             tol_range=tol_range2,
             freq_coff="freq",
-            ref_dict=ref_out20,
+            ref_dict=None,#151行需要做調整
             freq_sel=x
             ),freq_sel_device))
 
-        freq_sel_cir=[x/1E3 for x in freq_sel_cir]
-        fig, axes = plt.subplots(1,len(meas_params), figsize=(20, 10))
-        # sns.set(context='notebook', style='whitegrid')
+        freq_sel_cir_k=[x/1E3 for x in freq_sel_cir]
+        fig_1_graph_num = 3
+        fig, axes = plt.subplots(1,fig_1_graph_num , figsize=(20, 10))
+        fig2, axes2 = plt.subplots(1,len(meas_params)-fig_1_graph_num, figsize=(20, 10))
+
+        rm_param_sel="vout_avg" # 因為幾乎在不同頻率下沒有麼差異 趨進 0 %  Vth point 繪圖 不予繪圖
+        # meas_params_rm=[x for x in meas_params if x != rm_param_sel]
+        fig3, axes3 = plt.subplots(1, fig_1_graph_num, figsize=(20, 10))
+        fig4, axes4 = plt.subplots(1, len(meas_params) - fig_1_graph_num, figsize=(20, 10))
+
+        fix_points = [10,20,30,40,45]
+        sns.set(context='notebook', style='whitegrid')
         step_match_idx=[]
         step_list=[]
+        drawing_range=[]
+        # 總圖 包含了各個frequency 的變化
+        # 可以知道 隨著老化狀況變的嚴重 各個指標的影響 呈現 Exponential 式的增長
+        # 頻率越高者這個狀況越嚴重 對於老化帶來的影響會放大
+        # 第一章圖包含了 switching loss  ripple voltage efficiency
+        # switching loss 再高頻方面 隨著老化的增加 會呈現 exponential式 的增加
         for freq_idx,(data_collect_cir,data_collect_dev) in enumerate(zip(data_collections_cir,data_collections_dev)):
             pass
             pd_data1, data_dict1, step_dict1, var_dict1, var_dict_percent1, var_max_idxs1, var_max_dict1,ref_out1= data_collect_cir
@@ -187,18 +218,97 @@ def circuit_data_process(device_name,
             # if freq_idx==0:#認為 VTO 增幅固定 則Vth得出來的值 會相同 若認定 threshold votage 與 freq 有關 把if 這段去掉即可
             step_match_idx = [step_dict2['tol1'].index(i) for i in step_dict1['tol1']]
             step_list = [var_dict_percent2[param_sel][i] for i in step_match_idx]
-            for idx, (indicator, title) in enumerate(zip(meas_params, title_ll)):
+            drawing_range.append(max(step_list))
+            for idx, (indicator, title) in enumerate(zip(meas_params[0:fig_1_graph_num], title_ll[0:fig_1_graph_num])):
                 color = sns.color_palette("tab10")
-                axes[idx].plot(step_list, var_dict_percent1[indicator], color=color[freq_idx],label=str(freq_sel_cir[freq_idx])+"kHz")
+                for fix_point in fix_points:
+                    axes[idx].axvline(x=fix_point, color='0.7', linestyle='--')
+                axes[idx].plot(step_list, var_dict_percent1[indicator], color=color[freq_idx],label=str(freq_sel_cir_k[freq_idx])+"kHz")
                 axes[idx].yaxis.set_major_locator(MaxNLocator(5))
+                # axes[idx].yaxis.set_major_formatter(FormatStrFormatter('%.1f'))
                 axes[idx].xaxis.set_major_locator(MaxNLocator(5))
-                axes[idx].set_xlabel("Vth" + " variation(%)", fontsize=15)
-                axes[idx].set_title(title, fontsize=15)
-                axes[idx].tick_params(axis='x', labelsize=15)
-                axes[idx].tick_params(axis='y', labelsize=15)
-                axes[idx].set_xlim(min(step_list),
-                                   max(step_list))  # 因欸變換到 Vth 變化幅度為 X 軸 故需要 社從0 開始 若為 step 為橫軸 則我們起點需要設為1
-                axes[idx].legend(loc='best', fontsize=8, title="Frequency", title_fontsize=8)
+                axes[idx].set_xlabel("Vth" + " variation(%)", fontsize=20)
+                axes[idx].set_title(title, fontsize=20)
+                axes[idx].tick_params(axis='x', labelsize=20)
+                axes[idx].tick_params(axis='y', labelsize=20)
+                axes[idx].set_xlim(0,min(drawing_range))
+                # 限制了繪圖區域
+                axes[idx].legend(loc='best', fontsize=15, title="Frequency", title_fontsize=15)
+                # axes[idx].set_xticks(list(axes[idx].get_xticks()) + fix_points)# 防止 set xlim 失效
                 axes[idx].yaxis.grid()
+            fig.suptitle("Circuit Performance With Vth Aging Variation 0%% ~ %d%%" % min(drawing_range), fontsize=30,
+                         style="normal", weight="bold")
+            for idx, (indicator, title) in enumerate(zip(meas_params[fig_1_graph_num:], title_ll[fig_1_graph_num:])):
+                color = sns.color_palette("tab10")
+                for fix_point in fix_points:
+                    axes2[idx].axvline(x=fix_point, color='0.7', linestyle='--')
+                axes2[idx].plot(step_list, var_dict_percent1[indicator], color=color[freq_idx],label=str(freq_sel_cir_k[freq_idx])+"kHz")
+                axes2[idx].yaxis.set_major_locator(MaxNLocator(4))
+                # axes[idx].yaxis.set_major_formatter(FormatStrFormatter('%.1f'))
+                axes2[idx].xaxis.set_major_locator(MaxNLocator(4))
+                axes2[idx].set_xlabel("Vth" + " variation(%)", fontsize=15)
+                axes2[idx].set_title(title, fontsize=20)
+                axes2[idx].tick_params(axis='x', labelsize=15,rotation=30)
+                axes2[idx].tick_params(axis='y', labelsize=15,rotation=30)
+                axes2[idx].set_xlim(0,min(drawing_range))
+                axes2[idx].legend(loc='best', fontsize=15, title="Frequency", title_fontsize=15)
+                # axes2[idx].set_xticks(list(axes2[idx].get_xticks()) + fix_points)# 防止 set xlim 失效
+                axes2[idx].yaxis.grid()
+                # handles, labels = axes2[idx].get_legend_handles_labels()
+                # fig2.legend(handles, labels, loc='center left',title="Test Frequency",title_fontsize=15,fontsize=15)
+            fig2.suptitle("Circuit Performance With Vth Aging Variation 0%% ~ %d%%" % min(drawing_range), fontsize=30,
+                          style="normal", weight="bold")
+        ## 固定 Vth point 繪圖
+        for fix_idx,fix_point in enumerate(fix_points):
+            sns.set(context='notebook', style='whitegrid')
+            fix_indicator_y = {x: [] for x in meas_params}
+            for freq_idx,(data_collect_cir,data_collect_dev) in enumerate(zip(data_collections_cir, data_collections_dev)):
+                pass
+                pd_data1, data_dict1, step_dict1, var_dict1, var_dict_percent1, var_max_idxs1, var_max_dict1, ref_out1 = data_collect_cir
+                pd_data2, data_dict2, step_dict2, var_dict2, var_dict_percent2, var_max_idxs2, var_max_dict2, ref_out2 = data_collect_dev
+                # if freq_idx==0:#認為 VTO 增幅固定 則Vth得出來的值 會相同 若認定 threshold votage 與 freq 有關 把if 這段去掉即可
+                step_match_idx = [step_dict2['tol1'].index(i) for i in step_dict1['tol1']]
+                step_list = [var_dict_percent2[param_sel][i] for i in step_match_idx]
+                for indicator in meas_params:
+                    fix_indicator_y[indicator].append(np.interp(fix_point, step_list, var_dict_percent1[indicator]))
+            for idx, (indicator, title) in enumerate(zip(meas_params[0:fig_1_graph_num], title_ll[0:fig_1_graph_num])):
+                color = sns.color_palette("tab10")
+                var_percnt_ll = fix_indicator_y[indicator]
+                var_percnt_ll = var_percnt_ll - var_percnt_ll[0]
+                # var_percnt_ll = [round((x/var_percnt_ll[0]- 1) * 100, 2) for x in var_percnt_ll]  # 選擇哪一個頻率當作referance -1 為 freqll 最後一個頻率 0 為第一個
+                axes3[idx].plot(freq_sel_cir_k, var_percnt_ll, color=color[fix_idx],label="%d %%"%fix_point)
+                axes3[idx].yaxis.set_major_locator(MaxNLocator(4))
+                # axes[idx].yaxis.set_major_formatter(FormatStrFormatter('%.1f'))
+                axes3[idx].xaxis.set_major_locator(MaxNLocator(4))
+                axes3[idx].set_xlabel("Frequency", fontsize=20)
+                axes3[idx].set_title(title, fontsize=20)
+                axes3[idx].tick_params(axis='x', labelsize=20)
+                axes3[idx].tick_params(axis='y', labelsize=20)
+                axes3[idx].legend(loc='best', fontsize=15, title="Vth Aging Point", title_fontsize=15)
+                axes3[idx].set_xticks(list(axes3[idx].get_xticks())+[min(freq_sel_cir_k)])
+                axes3[idx].yaxis.grid()
+            for idx, (indicator, title) in enumerate(zip(meas_params[fig_1_graph_num:], title_ll[fig_1_graph_num:])):
+                color = sns.color_palette("tab10")
+                var_percnt_ll = fix_indicator_y[indicator]
+                var_percnt_ll = var_percnt_ll-var_percnt_ll[0]
+                # var_percnt_ll = [round((x / var_percnt_ll[0] - 1) * 100, 2) for x in var_percnt_ll]  # 選擇哪一個頻率當作referance -1 為 freqll 最後一個頻率 0 為第一個
+                axes4[idx].plot(freq_sel_cir_k, var_percnt_ll, color=color[fix_idx],label="%d %%" % fix_point)
+                axes4[idx].yaxis.set_major_locator(MaxNLocator(5))
+                # axes4[idx].yaxis.set_major_formatter(FormatStrFormatter('%.1f'))
+                axes4[idx].xaxis.set_major_locator(MaxNLocator(5))
+                axes4[idx].set_xlabel("Frequency", fontsize=15)
+                axes4[idx].set_title(title, fontsize=20)
+                axes4[idx].tick_params(axis='x', labelsize=15, rotation=30)
+                axes4[idx].tick_params(axis='y', labelsize=15, rotation=30)
+                axes4[idx].legend(loc='best', fontsize=15, title="Vth Aging Point", title_fontsize=15)
+                axes4[idx].set_xticks(list(axes4[idx].get_xticks())+[min(freq_sel_cir_k)])
+                axes4[idx].yaxis.grid()
+                # handles, labels = axes2[idx].get_legend_handles_labels()
+                # fig2.legend(handles, labels, loc='center left',title="Test Frequency",title_fontsize=15,fontsize=15)
+        fig4.suptitle("Frequency With Vth Aging Variation {}% ~ {}%".format(min(fix_points),max(fix_points)), fontsize=30,
+                          style="normal", weight="bold")
+        fig3.suptitle("Frequency With Vth Aging Variation {}% ~ {}%".format(min(fix_points),max(fix_points)), fontsize=30,
+                      style="normal", weight="bold")
+
         plt.show()
 

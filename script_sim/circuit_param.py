@@ -13,7 +13,7 @@ def boost_converter_param(Vo,Vi,Vd,Io,freq,delta_Vo,delta_Vi,L_coff,power_effice
     return L,C_in,C_out
 
 if Passive_Component_Size:
-    Vo=42
+    Vo=48
     Vi=18
     Vd=0.875 # #查詢diode 的 datasheet
     R_load=28
@@ -73,7 +73,7 @@ if Passive_Component_Size:
         axes[idx].set_xticks(list(axes[idx].get_xticks()) + [60])
         # axes[idx].set_xticks([60,200,400,600,800,1000])
         axes[idx].yaxis.grid()
-    plt.suptitle('Frequency V.S. Passive Components Size',fontsize=25)
+    plt.suptitle('Frequency V.S. Passive Components Size',fontsize=25, weight="bold")
     plt.show()
 Ciss=1940E-12
 freq=200E3
